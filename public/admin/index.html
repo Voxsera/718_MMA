@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin CRM | 718 MMA Gym</title>
+  <link rel="stylesheet" href="./admin.css" />
+</head>
+<body>
+  <!-- LOGIN -->
+  <div id="login">
+    <div class="login-box">
+      <div style="text-align:center;margin-bottom:8px"><div class="logo" style="font-size:44px">7<b style="color:var(--red)">18</b></div><small style="font-family:var(--cond);letter-spacing:4px;color:var(--grey)">ADMIN · CRM</small></div>
+      <form class="form" id="login-form">
+        <h2 style="font-family:var(--cond);letter-spacing:1px;text-align:center">Admin Login</h2>
+        <label>Username</label><input name="username" required value="admin" />
+        <label>Password</label><input type="password" name="password" required />
+        <button class="btn btn-primary btn-block" style="margin-top:18px">Sign In →</button>
+        <div class="form-msg err" id="lmsg"></div>
+        <p class="hint" style="text-align:center;margin-top:14px">Default: admin / 718mma (change in .env)</p>
+      </form>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="admin-wrap" id="app" style="display:none">
+    <aside class="side">
+      <div class="brand"><div class="logo" style="font-size:30px">7<b style="color:var(--red)">18</b></div><small style="font-family:var(--cond);letter-spacing:4px;font-size:10px;color:var(--grey)">ADMIN CRM</small></div>
+      <a data-v="dash" class="active">📊 Dashboard</a>
+      <a data-v="events">🗓️ Events</a>
+      <a data-v="trials">🥊 Trial Bookings</a>
+      <a data-v="collabs">🤝 Collaborations</a>
+      <a data-v="payments">💳 Payments</a>
+      <a data-v="members">🎟️ Members</a>
+      <a data-v="memberships">🎫 Plans</a>
+      <a href="/" style="color:var(--grey)">↩ Back To Site</a>
+      <a id="logout" style="color:var(--red)">⎋ Logout</a>
+    </aside>
+    <main class="main">
+      <div class="topbar"><h1 id="title" class="text-red">Dashboard</h1></div>
+      <section class="view active" id="v-dash"><div class="cards" id="stats"></div><div class="seg">Latest Trial Bookings</div><div id="recent-trials"></div></section>
+      <section class="view" id="v-events">
+        <p class="hint" style="margin-bottom:14px">Move events through their lifecycle: <b style="color:#fff">Upcoming → Ongoing → Past</b>. Changes show instantly on the public site.</p>
+        <button class="btn btn-outline mini" id="add-event" style="margin-bottom:16px;padding:10px 18px">+ Add Event</button>
+        <div id="events-table"></div>
+      </section>
+      <section class="view" id="v-trials"><div id="trials-table"></div></section>
+      <section class="view" id="v-collabs"><div id="collabs-table"></div></section>
+      <section class="view" id="v-payments"><div id="payments-table"></div></section>
+      <section class="view" id="v-members"><p class="hint" style="margin-bottom:14px">Active members can sign in with Google. Membership is granted automatically on successful payment.</p><div id="members-table"></div></section>
+      <section class="view" id="v-memberships"><p class="hint" style="margin-bottom:14px">Edit plan prices — updates apply to the public site immediately.</p><div id="memberships-table"></div></section>
+    </main>
+  </div>
+  <script src="./admin.js"></script>
+</body>
+</html>

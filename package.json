@@ -1,0 +1,27 @@
+{
+  "name": "718-mma-gym",
+  "version": "2.0.0",
+  "description": "718 MMA Gym - React + Three.js site, Express + SQLite API, Google auth, Razorpay UPI, Admin CRM.",
+  "main": "server.js",
+  "type": "commonjs",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "start": "node --experimental-sqlite server.js",
+    "seed": "node --experimental-sqlite seed.js",
+    "client": "npm --prefix client run dev",
+    "build": "npm --prefix client install && npm --prefix client run build",
+    "dev": "node --experimental-sqlite server.js",
+    "setup": "npm install && npm --prefix client install && npm run seed"
+  },
+  "keywords": ["mma", "gym", "boxing", "muaythai", "bjj", "hyderabad", "react", "threejs"],
+  "author": "718 MMA Gym",
+  "license": "MIT",
+  "dependencies": {
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "google-auth-library": "^9.14.0",
+    "jsonwebtoken": "^9.0.2",
+    "razorpay": "^2.9.4"
+  }
+}
