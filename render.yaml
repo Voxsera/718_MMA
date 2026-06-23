@@ -1,19 +1,19 @@
 # Render Blueprint for 718 MMA Gym (one service: site + API + admin + SQLite)
-# Deploy: push to GitHub, then Render → New → Blueprint → pick this repo.
+# This is the FREE-TIER version: no card required, no persistent disk.
+# Data is re-seeded on each restart (fine for a preview). To keep data permanently,
+# switch to the paid disk setup — see the commented block at the bottom.
 services:
   - type: web
     name: 718-mma-gym
     runtime: node
-    plan: starter            # "starter" (paid) is needed for the persistent disk below.
-    buildCommand: npm install && npm run build   # installs API deps + builds the React client
-    startCommand: npm start                       # node --experimental-sqlite server.js
+    plan: free                                    # no payment info required
+    buildCommand: npm install && npm run build    # installs API deps + builds the React client
+    startCommand: npm start                        # node --experimental-sqlite server.js
     healthCheckPath: /api/config
     autoDeploy: true
     envVars:
       - key: NODE_VERSION
         value: 22.12.0
-      - key: DB_PATH
-        value: /data/data.db          # store SQLite on the persistent disk
       - key: SESSION_SECRET
         generateValue: true
       - key: JWT_SECRET
@@ -21,7 +21,8 @@ services:
       - key: ADMIN_USERNAME
         value: admin
       - key: ADMIN_PASSWORD
-        sync: false                   # set in the Render dashboard (don't commit secrets)
+        sync: false          # set in the Render dashboard
+      # Optional — leave unset to run in MOCK mode until you have them (add in 2 days):
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
@@ -30,7 +31,14 @@ services:
         sync: false
       - key: RAZORPAY_KEY_SECRET
         sync: false
-    disk:
-      name: data
-      mountPath: /data                # persists data.db across deploys & restarts
-      sizeGB: 1
+
+# ---------------------------------------------------------------------------
+# LATER, for permanent data (paid): change "plan: free" to "plan: starter",
+# add the env var  DB_PATH = /data/data.db , and add this disk block under the
+# service (indented like the keys above):
+#
+#    disk:
+#      name: data
+#      mountPath: /data
+#      sizeGB: 1
+# ---------------------------------------------------------------------------

@@ -26,7 +26,7 @@ git push -u origin main
 Easiest (uses `render.yaml`):
 1. Render Dashboard → **New → Blueprint**.
 2. Connect your repo and select it. Render reads `render.yaml`.
-3. It creates a Web Service with a 1 GB disk mounted at `/data` and `DB_PATH=/data/data.db`.
+3. It creates a **free** Web Service. No card required. (Data re-seeds on restart — see the note.)
 
 Or manually (no blueprint):
 - **New → Web Service** → connect repo.
@@ -35,10 +35,17 @@ Or manually (no blueprint):
 - **Add a Disk:** name `data`, mount path `/data`, size 1 GB.
 - Add env var `DB_PATH=/data/data.db` and `NODE_VERSION=22.12.0`.
 
-> The disk needs Render's paid **Starter** plan. On the **free** plan you can skip the disk and
-> remove `DB_PATH` — the app still runs and **auto-seeds demo data on every boot**, but
-> bookings/payments won't persist across redeploys/sleeps. For real data, use the disk
-> (Render Starter) or a Railway **Volume**.
+> **Free vs paid.** The blueprint uses the **free** plan, so no payment info is needed. The
+> trade-off: the free instance sleeps when idle and its disk is ephemeral, so it **auto-seeds
+> demo data on each restart** and bookings/payments don't persist. When you go live, switch
+> `plan: free` → `plan: starter`, add `DB_PATH=/data/data.db`, and uncomment the `disk:` block
+> in `render.yaml` (or use a Railway **Volume**). That keeps data permanently.
+
+## Don't have Google / Razorpay keys yet?
+That's fine — they are **optional** and do **not** block deploying. Leave them unset and the app
+runs in **mock mode**: the site, admin CRM, trial/collab forms and event management all work;
+login is hidden and payments are simulated. Add the keys later in the Render **Environment** tab
+(then "Manual Deploy → Clear build cache & deploy", or just restart) — no code changes needed.
 
 ## 3. Set environment variables (Render → your service → Environment)
 | Variable | Value |
