@@ -16,10 +16,10 @@ export default function Collaboration() {
     else setMsg({ t: 'err', m: res.error || 'Something went wrong.' });
   };
 
-  const cards = [['🏟️ Venue Rental', 'Full arena and mat space on a day-based rental for your event.'],
-    ['🥊 Tournaments', 'Host amateur or pro combat sports tournaments with our cage and ring.'],
-    ['🎓 Workshops', 'Seminars, fitness challenges and skill camps with top names.'],
-    ['🎉 Gatherings', 'Private gatherings, brand activations and community events.']];
+  const cards = [['Venue Rental', 'Full arena and mat space on a day-based rental for your event.'],
+    ['Tournaments', 'Host amateur or pro combat sports tournaments with our cage and ring.'],
+    ['Workshops', 'Seminars, fitness challenges and skill camps with top names.'],
+    ['Gatherings', 'Private gatherings, brand activations and community events.']];
 
   return (
     <PageHead crumb="Collaboration" title='Host Your Next <span class="text-red">Fight Event Here</span>'
@@ -44,7 +44,7 @@ export default function Collaboration() {
               <label>Type Of Collaboration</label><select value={form.type} onChange={set('type')}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select>
               <label>Tell Us More</label><textarea rows="4" value={form.message} onChange={set('message')} placeholder="Dates, expected attendance, what you have in mind..." />
               <button className="btn btn-primary btn-block" style={{ marginTop: 18 }}>Send Request →</button>
-              {msg && <p className={`form-msg ${msg.t}`}>{msg.t === 'ok' ? '✅ ' : '⚠️ '}{msg.m}</p>}
+              {msg && <p className={`form-msg ${msg.t}`}>{msg.m}</p>}
             </form>
           </Reveal>
         </div>

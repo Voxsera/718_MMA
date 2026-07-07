@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageHead from '../components/PageHead.jsx';
 import Reveal from '../components/Reveal.jsx';
 import CheckoutModal from '../components/CheckoutModal.jsx';
@@ -8,28 +9,44 @@ import { api, inr } from '../api';
 export default function Memberships() {
   const [plans, setPlans] = useState([]);
   const [selected, setSelected] = useState(null);
-  const { refresh } = useAuth();
+  const { user, refresh } = useAuth();
+  const navigate = useNavigate();
+  const buy = (p) => { if (!user) { navigate('/login', { state: { from: '/' + window.location.pathname.split('/').pop() } }); return; } setSelected({ name: p.name, price: p.price }); };
   useEffect(() => { api.get('/api/memberships').then((m) => setPlans(m.filter((x) => x.type === 'membership'))).catch(() => {}); }, []);
+
+  // Group plans by category parsed from the name ("MMA — 1 Month" -> "MMA").
+  const groups = [];
+  plans.forEach((p) => {
+    const cat = (String(p.name).split('—')[0] || 'Membership').trim();
+    let g = groups.find((x) => x.cat === cat);
+    if (!g) { g = { cat, items: [] }; groups.push(g); }
+    g.items.push(p);
+  });
 
   return (
     <PageHead crumb="Memberships" title='Join <span class="text-red">718</span>'
       sub="One membership unlocks all 8 disciplines, 4 sessions a day and full facility access. Pay securely with UPI, cards, netbanking or wallets — and unlock member login.">
       <section style={{ paddingTop: 50 }}>
         <div className="container">
-          <div className="grid grid-4">
-            {plans.map((p, i) => (
-              <Reveal key={p.id} delay={i * 0.05}>
-                <div className={`price-card ${p.popular ? 'popular' : ''}`}>
-                  {p.popular ? <div className="ribbon">Best Value</div> : null}
-                  <h3>{p.name}</h3>
-                  <div className="price">{inr(p.price)}</div>
-                  <div className="dur">{p.duration}</div>
-                  <ul>{p.features.split('\n').map((f, k) => <li key={k}>{f}</li>)}</ul>
-                  <button className="btn btn-primary btn-block" onClick={() => setSelected({ name: p.name, price: p.price })}>Join Now</button>
-                </div>
-              </Reveal>
-            ))}
-          </div>
+          {groups.map((g) => (
+            <div key={g.cat} style={{ marginBottom: 44 }}>
+              <h2 className="section-title" style={{ marginBottom: 22 }}>{g.cat}</h2>
+              <div className="grid grid-4">
+                {g.items.map((p, i) => (
+                  <Reveal key={p.id} delay={i * 0.05}>
+                    <div className={`price-card ${p.popular ? 'popular' : ''}`}>
+                      {p.popular ? <div className="ribbon">Best Value</div> : null}
+                      <h3>{p.duration}</h3>
+                      <div className="price">{inr(p.price)}</div>
+                      <div className="dur">{g.cat}</div>
+                      <ul>{p.features.split('\n').map((f, k) => <li key={k}>{f}</li>)}</ul>
+                      <button className="btn btn-primary btn-block" onClick={() => buy(p)}>Join Now</button>
+                    </div>
+                  </Reveal>
+                ))}
+              </div>
+            </div>
+          ))}
           <p style={{ textAlign: 'center', color: 'var(--grey)', marginTop: 30 }}>Secured by <b style={{ color: '#fff' }}>Razorpay</b> · UPI, cards, netbanking &amp; wallets accepted</p>
         </div>
       </section>

@@ -3,9 +3,6 @@ import PageHead from '../components/PageHead.jsx';
 import Reveal from '../components/Reveal.jsx';
 import { api } from '../api';
 
-const brand = (u) => (u.includes('swiggy') ? 'Swiggy' : 'Zomato');
-const color = (u) => (u.includes('swiggy') ? '#fc8019' : '#e23744');
-
 export default function Food() {
   const [foods, setFoods] = useState([]);
   useEffect(() => { api.get('/api/foods').then(setFoods).catch(() => {}); }, []);
@@ -16,9 +13,8 @@ export default function Food() {
       <section style={{ paddingTop: 30 }}>
         <div className="container">
           <Reveal className="form" style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', marginBottom: 40, borderLeft: '3px solid var(--red)' }}>
-            <div style={{ fontSize: 40 }}>🛵</div>
             <div><h3 style={{ fontFamily: 'var(--cond)', letterSpacing: 1, textTransform: 'uppercase' }}>Order directly from the 718 app</h3>
-              <p style={{ color: 'var(--grey-light)' }}>Every meal below is integrated with <b style={{ color: '#fc8019' }}>Swiggy</b> and <b style={{ color: '#e23744' }}>Zomato</b>. Tap "Order Now" to get it delivered.</p></div>
+              <p style={{ color: 'var(--grey-light)' }}>Every meal below is available on <b style={{ color: '#fc8019' }}>Swiggy</b> and <b style={{ color: '#e23744' }}>Zomato</b>. Choose your platform to get it delivered.</p></div>
           </Reveal>
           <div className="grid grid-3">
             {foods.map((f, i) => (
@@ -28,7 +24,10 @@ export default function Food() {
                     <h3 style={{ marginTop: 12 }}>{f.name}</h3>
                     <p style={{ margin: '8px 0' }}>{f.description}</p>
                     <p style={{ color: 'var(--grey)', fontFamily: 'var(--cond)', letterSpacing: 1 }}>{f.calories} · {f.protein}</p>
-                    <a href={f.order_url} target="_blank" rel="noreferrer" className="btn btn-block" style={{ marginTop: 14, background: color(f.order_url), color: '#fff' }}>Order on {brand(f.order_url)} →</a>
+                    <div style={{ display: 'flex', gap: 10, marginTop: 'auto', paddingTop: 16 }}>
+                      <a href="https://www.swiggy.com" target="_blank" rel="noreferrer" className="btn" style={{ flex: 1, padding: '13px 10px', justifyContent: 'center', background: '#fc8019', color: '#fff', fontSize: 14, letterSpacing: 1.5 }}>Swiggy</a>
+                      <a href="https://www.zomato.com" target="_blank" rel="noreferrer" className="btn" style={{ flex: 1, padding: '13px 10px', justifyContent: 'center', background: '#e23744', color: '#fff', fontSize: 14, letterSpacing: 1.5 }}>Zomato</a>
+                    </div>
                   </div></div>
               </Reveal>
             ))}

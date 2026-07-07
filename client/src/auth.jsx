@@ -19,15 +19,21 @@ export function AuthProvider({ children }) {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const loginWithGoogle = async (credential) => {
-    const res = await api.post('/api/auth/google', { credential });
+  const handle = (res) => {
     if (res.ok) { setUser(res.user); setMembership(res.membership); return { ok: true }; }
-    return { ok: false, error: res.message || res.error };
+    return { ok: false, error: res.message || res.error || 'Something went wrong.' };
   };
 
+  const register = async (name, email, password) => handle(await api.post('/api/auth/register', { name, email, password }));
+  const login = async (email, password) => handle(await api.post('/api/auth/login', { email, password }));
+  const loginWithGoogle = async (credential) => handle(await api.post('/api/auth/google', { credential }));
   const logout = async () => { await api.post('/api/auth/logout'); setUser(null); setMembership(null); };
 
-  return <AuthCtx.Provider value={{ user, membership, ready, loginWithGoogle, logout, refresh }}>{children}</AuthCtx.Provider>;
+  return (
+    <AuthCtx.Provider value={{ user, membership, ready, register, login, loginWithGoogle, logout, refresh }}>
+      {children}
+    </AuthCtx.Provider>
+  );
 }
 
 export const useAuth = () => useContext(AuthCtx);

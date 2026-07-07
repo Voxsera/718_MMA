@@ -5,18 +5,19 @@ A full-stack build inspired by fenriz-gym.com, in the 718 black-and-red theme �
 
 ## Stack
 - **Frontend:** React 18 + Vite, React Router, Framer Motion, @react-oauth/google
-- **Backend:** Node + Express, **built-in `node:sqlite`** (no native build!), google-auth-library, jsonwebtoken, Razorpay
+- **Backend:** Node + Express, **Supabase (PostgreSQL)** via `pg`, google-auth-library, jsonwebtoken, Razorpay
 - **Admin CRM:** self-contained HTML/CSS/JS served at `/admin`
 
 ## Requirements
-- **Node.js v22.5 or newer** (LTS 22 or 24). The database uses Node's built-in SQLite, so there is **nothing to compile** and `npm install` is fast. Check with `node -v`.
+- **Node.js v18 or newer.**
+- A **Supabase** project (free) for the PostgreSQL database — its connection string goes in `DATABASE_URL`.
 
 ## Pages
 Home (cinematic hero), Courses (MMA, Muay Thai, Kickboxing, Boxing, Jujutsu, BJJ, Wrestling, CrossFit), Personal Training, Memberships, Events (Past/Ongoing/Upcoming), Food (Swiggy/Zomato), Collaboration, Free Trial, About, Merchandise (coming soon), Physio/Rehab (coming soon), Member Login, Member Dashboard.
 
 ## Key features
 - **Cinematic hero** — full-bleed photographic hero with a slow Ken Burns zoom, layered dark/red gradients and chevron motifs.
-- **Google sign-in + member gate** — login only succeeds for an email with an **active (non-expired) membership**. Buying a membership creates/extends that membership automatically.
+- **Accounts** — email/password **or** Google sign-in. Buying a membership is gated behind login and attaches to the account; the same credentials will work in the mobile app. An active membership unlocks member-only features.
 - **Razorpay with UPI** — checkout shows UPI first, plus cards/netbanking/wallets. Falls back to a safe **mock mode** without keys.
 - **Admin CRM** at `/admin` — dashboard, move events `Upcoming → Ongoing → Past`, manage trials, collaborations, payments, members and plan prices.
 - **Mobile responsive** throughout.
@@ -24,8 +25,10 @@ Home (cinematic hero), Courses (MMA, Muay Thai, Kickboxing, Boxing, Jujutsu, BJJ
 ## Setup & run
 
 ```bash
-# 1. Install everything (backend + client) and seed demo data
-npm run setup        # = npm install && npm --prefix client install && npm run seed
+# 0. Set DATABASE_URL in .env (your Supabase connection string) first!
+
+# 1. Install everything (backend + client)
+npm run setup        # = npm install && npm --prefix client install
 
 # 2a. Development (two terminals)
 npm start            # API on http://localhost:3000  (also serves /admin)
@@ -56,6 +59,11 @@ RAZORPAY_KEY_SECRET=xxxx
 
 The React client reads the Google Client ID from the server via `/api/config`, so setting `GOOGLE_CLIENT_ID` in the root `.env` is enough. (Optionally set `VITE_GOOGLE_CLIENT_ID` in `client/.env`.)
 
+### Supabase (database)
+1. Create a free project at https://supabase.com.
+2. **Project → Settings → Database → Connection string → URI**. Copy it and put it in `.env` as `DATABASE_URL` (replace `[PASSWORD]` with your DB password). The connection **pooler** URI (port 6543) is recommended for hosting.
+3. That's it — tables are created automatically on first run, and demo content seeds itself if the DB is empty. (Run `npm run seed` anytime to reset demo content.)
+
 ### Google OAuth setup
 1. Go to https://console.cloud.google.com/apis/credentials → **Create Credentials → OAuth client ID → Web application**.
 2. **Authorized JavaScript origins:** add `http://localhost:5173` and `http://localhost:3000`.
@@ -67,15 +75,15 @@ The React client reads the Google Client ID from the server via `/api/config`, s
 - Test UPI success VPA: `success@razorpay`.
 - With placeholder keys, the app runs in **mock mode**: it simulates a successful payment, activates the membership (so you can test the Google login gate end-to-end), and logs it in the CRM.
 
-## Membership → login flow
-1. Visitor buys a plan on **Memberships** (or a PT package) with their email.
-2. Payment success → server stores an active `user_membership` for that email (expiry by plan: Day 1d, Monthly 30d, Quarterly 90d, Annual 365d, PT 30d).
-3. Visitor goes to **Login**, signs in with the Google account for that email → access granted to the member **Dashboard**.
-4. Expired members are blocked until they renew.
+## Account → membership → app flow (account-first)
+1. Visitor **creates an account** (email + password) or **signs in with Google** on the website.
+2. While logged in, they **buy a membership** (or PT package) → it attaches to their account (expiry by plan: Day 1d, Monthly 30d, Quarterly 90d, Annual 365d, PT 30d).
+3. The **same email + password** logs into the website member area **and the upcoming 718 mobile app**.
+4. Login is open to anyone; an **active membership** unlocks member-only features. Buying is gated behind login, so every payment is tied to a real account.
 
 ## Notes
 - Images load from Unsplash (need internet); they degrade gracefully if offline.
-- `data.db` is created automatically. Re-running `npm run seed` resets demo content but keeps bookings/payments/members.
+- Tables are created automatically on first boot. `npm run seed` resets demo content (courses/events/etc.) but keeps bookings, payments, users and memberships.
 
 ## Troubleshooting
 
@@ -89,7 +97,9 @@ npm run seed
 npm start
 ```
 
-**`node:sqlite` not found:** upgrade to Node v22.5+ (`node -v`). Download LTS from https://nodejs.org.
+**`DATABASE_URL is not set`:** add your Supabase connection string to `.env` (or the host's env vars).
+
+**Connection/SSL errors to Supabase:** make sure you used the **pooler** URI; the app already enables SSL for non-localhost connections.
 
 ## Deploying
 See **DEPLOY.md** for a step-by-step guide (Render / Railway, with persistent SQLite).

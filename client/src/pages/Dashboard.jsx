@@ -33,7 +33,7 @@ export default function Dashboard() {
             <Reveal delay={0.05}><div className="price-card">
               <div className="section-label">Today's Sessions</div>
               <ul style={{ listStyle: 'none' }}>
-                <li>🕡 6:30 – 8:00 AM</li><li>🕗 8:00 – 9:30 AM</li><li>🌆 6:30 – 8:00 PM</li><li>🌙 8:00 – 9:30 PM</li>
+                <li>6:30 – 8:00 AM</li><li>8:00 – 9:30 AM</li><li>6:30 – 8:00 PM</li><li>8:00 – 9:30 PM</li>
               </ul>
               <p style={{ color: 'var(--grey)', fontSize: 13 }}>All 8 disciplines included. Just walk in.</p>
             </div></Reveal>
@@ -42,7 +42,6 @@ export default function Dashboard() {
               <div className="section-label">Quick Links</div>
               <Link to="/events" className="btn btn-outline btn-block" style={{ marginBottom: 10 }}>Upcoming Events</Link>
               <Link to="/food" className="btn btn-outline btn-block" style={{ marginBottom: 10 }}>Order Food</Link>
-              <Link to="/personal-training" className="btn btn-outline btn-block" style={{ marginBottom: 10 }}>Personal Training</Link>
               <button className="btn btn-primary btn-block" onClick={async () => { await logout(); navigate('/'); }}>Logout</button>
             </div></Reveal>
           </div>

@@ -1,45 +1,46 @@
 /**
- * Seeds the database with demo data for 718 MMA Gym.
- * Run with:  npm run seed
- * Safe to re-run — it wipes and reloads the seed tables (not bookings/payments).
+ * Seeds the database (Supabase/Postgres) with demo data for 718 MMA Gym.
+ * Run directly:  npm run seed
+ * Or imported by server.js and awaited on first boot.
+ * Wipes and reloads the seed tables (courses/memberships/trainers/foods/reviews/events);
+ * it does NOT touch bookings, payments, users or memberships.
  */
 const db = require('./db');
 
 const img = (id) => `https://images.unsplash.com/${id}?w=900&q=70&auto=format&fit=crop`;
 
-// ---- Courses ----
 const courses = [
   ['mma', 'MMA', 'Mixed Martial Arts', 'The complete combat discipline — striking, grappling and ground game blended into one. Train like a fighter, build real confidence.', img('photo-1605296867304-46d5465a13f1'), 1],
   ['muay-thai', 'Muay Thai', 'The Art of Eight Limbs', 'Fists, elbows, knees and shins. Sharpen your stand-up game with authentic Thai boxing under experienced coaches.', img('photo-1549719386-74dfcbf7dbed'), 2],
   ['kickboxing', 'Kickboxing', 'Power & Cardio', 'Explosive kicks and punches with high-intensity conditioning. Burn fat, build power, learn to fight.', img('photo-1517438476312-10d79c077509'), 3],
   ['boxing', 'Boxing', 'The Sweet Science', 'Footwork, head movement and crisp punches. From first-timers to competitors, build hands of stone.', img('photo-1599058917212-d750089bc07e'), 4],
   ['jujutsu', 'Jujutsu', 'Traditional Grappling', 'Classic Japanese jujutsu — joint locks, throws and self-defense fundamentals for every body type.', img('photo-1555597673-b21d5c935865'), 5],
-  ['bjj', 'BJJ', 'Brazilian Jiu-Jitsu', 'The gentle art. Leverage and technique over strength — control any opponent on the ground.', img('photo-1574680178050-55c6a6a96e0a'), 6],
   ['wrestling', 'Wrestling', 'Takedowns & Control', 'Olympic-style wrestling. Master takedowns, scrambles and top control — the backbone of MMA.', img('photo-1517649763962-0c623066013b'), 7],
   ['crossfit', 'CrossFit', 'Functional Strength', 'Strength and conditioning built for fighters and everyone else. Move better, hit harder, last longer.', img('photo-1534438327276-14e5300c3a48'), 8],
 ];
 
-// ---- Memberships & Personal Training ----
 const memberships = [
-  ['Day Pass', 'membership', 300, '1 day', 'Full facility & equipment access\nJoin any of the 4 daily sessions\nAll disciplines included', 0, 1],
-  ['Monthly', 'membership', 3000, '1 month', 'Unlimited classes (all 8 disciplines)\n4 sessions every day, 6 AM – 12 AM\nFull facility & equipment access\nFree locker', 1, 2],
-  ['Quarterly', 'membership', 8000, '3 months', 'Everything in Monthly\nSave ₹1,000 vs monthly\n1 free PT session\nPriority event booking', 0, 3],
-  ['Annual', 'membership', 28000, '12 months', 'Everything in Quarterly\nSave ₹8,000 vs monthly\n4 free PT sessions\nFree 718 MMA tee\nGuest passes', 0, 4],
-  // Personal training
-  ['PT — Starter', 'personal_training', 6000, '8 sessions / month', '2 sessions per week\n1-on-1 coaching\nCustom training plan\nForm & technique focus', 0, 5],
-  ['PT — Pro', 'personal_training', 10000, '12 sessions / month', '3 sessions per week\n1-on-1 coaching\nCustom plan + diet guidance\nFight-prep available', 1, 6],
-  ['PT — Elite', 'personal_training', 16000, '20 sessions / month', '5 sessions per week\nDedicated head coach\nFull diet + recovery plan\nCompetition cornering', 0, 7],
+  // ---- MMA ----
+  ['MMA — 1 Month', 'membership', 2499, '1 Month', 'MMA — all striking & grappling\nChoose your daily session\nFull facility & equipment access', 0, 1],
+  ['MMA — 3 Months', 'membership', 5999, '3 Months', 'MMA — all striking & grappling\nChoose your daily session\nSave vs monthly', 0, 2],
+  ['MMA — 6 Months', 'membership', 8999, '6 Months', 'MMA — all striking & grappling\nChoose your daily session\nGreat for regulars', 0, 3],
+  ['MMA — 1 Year', 'membership', 14000, '1 Year', 'MMA — all striking & grappling\nChoose your daily session\nMaximum savings', 0, 4],
+  // ---- CrossFit ----
+  ['CrossFit — 1 Month', 'membership', 1999, '1 Month', 'CrossFit strength & conditioning\nChoose your daily session\nFull facility access', 0, 5],
+  ['CrossFit — 3 Months', 'membership', 4500, '3 Months', 'CrossFit strength & conditioning\nChoose your daily session\nSave vs monthly', 0, 6],
+  ['CrossFit — 6 Months', 'membership', 7500, '6 Months', 'CrossFit strength & conditioning\nChoose your daily session', 0, 7],
+  ['CrossFit — 1 Year', 'membership', 12000, '1 Year', 'CrossFit strength & conditioning\nChoose your daily session\nMaximum savings', 0, 8],
+  // ---- Both MMA & CrossFit ----
+  ['MMA + CrossFit — 1 Month', 'membership', 2999, '1 Month', 'Full access — MMA + CrossFit\nChoose your daily session\nEverything included', 0, 9],
+  ['MMA + CrossFit — 3 Months', 'membership', 6999, '3 Months', 'Full access — MMA + CrossFit\nChoose your daily session\nBest value', 1, 10],
+  ['MMA + CrossFit — 6 Months', 'membership', 10500, '6 Months', 'Full access — MMA + CrossFit\nChoose your daily session', 0, 11],
+  ['MMA + CrossFit — 1 Year', 'membership', 18000, '1 Year', 'Full access — MMA + CrossFit\nChoose your daily session\nMaximum savings', 0, 12],
 ];
 
-// ---- Trainers ----
 const trainers = [
-  ['Coach Imran', 'MMA & Wrestling', 10000, 'National-level grappler. Specializes in takedowns, cage control and fight IQ.', img('photo-1567013127542-490d757e51fc')],
-  ['Coach Rahul', 'Muay Thai & Kickboxing', 9000, 'A-class Muay Thai fighter. Razor-sharp striking and conditioning.', img('photo-1583454110551-21f2fa2afe61')],
-  ['Coach Vikram', 'Boxing', 9000, 'Ex-amateur boxing champ. Builds clean fundamentals and knockout power.', img('photo-1594381898411-846e7d193883')],
-  ['Coach Aisha', 'BJJ & Jujutsu', 9500, 'Brown belt under a renowned academy. Patient, technical ground game.', img('photo-1549476464-37392f717541')],
+  ['Coach Saif "Thai Boxer"', 'Muay Thai & Striking', 9000, 'Professional Muay Thai coach certified in Bangkok with 10+ years in martial arts. National Muay Thai & MMA champion who has trained 500+ students across Telangana. Leads the 718 stand-up, clinch and striking program for all levels.', '/saif_thai_boxer.png'],
 ];
 
-// ---- Food ----
 const foods = [
   ['Grilled Chicken & Quinoa Bowl', 'Post-Workout', 'Lean protein with complex carbs to refuel and rebuild muscle after training.', '520 kcal', '48g protein', img('photo-1546069901-ba9599a7e63c'), 'https://www.swiggy.com'],
   ['Egg White Omelette', 'Pre-Workout', 'Light, high-protein and easy to digest before you hit the mats.', '280 kcal', '26g protein', img('photo-1525351484163-7529414344d8'), 'https://www.zomato.com'],
@@ -49,7 +50,6 @@ const foods = [
   ['Grilled Fish & Sweet Potato', 'Dinner', 'Omega-3 rich lean protein with clean carbs to wind down the day.', '460 kcal', '40g protein', img('photo-1467003909585-2f8a72700288'), 'https://www.zomato.com'],
 ];
 
-// ---- Reviews (static Google reviews) ----
 const reviews = [
   ['Sai Teja', 5, 'Best MMA gym in Hyderabad hands down. Coaches actually care and the facility is open till midnight which is perfect for my schedule.', '6 days ago'],
   ['Muaythai Hype', 5, 'To be honest, best place for sports events. Hosted ours here and it was flawless.', '1 day ago'],
@@ -59,7 +59,6 @@ const reviews = [
   ['Sneha R', 5, 'As a woman starting out I felt safe and welcomed. BJJ coach is incredibly patient. Love this place.', '1 month ago'],
 ];
 
-// ---- Events (past / ongoing / upcoming) ----
 const events = [
   ['718 Grand Opening Showcase', 'Our launch event — exhibition fights, free classes and a community celebration on the mats.', '2026-01-18', '718 MMA, Shivarampally', img('photo-1547347298-4074fc3086f0'), 'past'],
   ['Inter-Gym Boxing Sparring', 'Friendly sparring meet with boxing gyms across Hyderabad. Great turnout, great energy.', '2026-03-22', '718 MMA Arena', img('photo-1581009146145-b5ef050c2e1e'), 'past'],
@@ -69,27 +68,53 @@ const events = [
   ['BJJ Seminar with Black Belt', 'Special guest seminar — advanced guard systems and competition strategy.', '2026-09-14', '718 MMA, Shivarampally', img('photo-1555597673-b21d5c935865'), 'upcoming'],
 ];
 
-const tx = db.transaction(() => {
-  db.exec('DELETE FROM courses; DELETE FROM memberships; DELETE FROM trainers; DELETE FROM foods; DELETE FROM reviews; DELETE FROM events;');
+const classes = [
+  // day_of_week: 0=Sun ... 6=Sat
+  ['Morning MMA', 'MMA', 1, '06:30', '08:00', 20, 'Coach Imran'],
+  ['Muay Thai', 'Muay Thai', 1, '18:30', '20:00', 20, 'Coach Saif'],
+  ['Boxing Fundamentals', 'Boxing', 2, '06:30', '08:00', 18, 'Coach Vikram'],
+  ['BJJ All Levels', 'BJJ', 2, '20:00', '21:30', 16, 'Coach Aisha'],
+  ['Wrestling', 'Wrestling', 3, '18:30', '20:00', 16, 'Coach Imran'],
+  ['Kickboxing Cardio', 'Kickboxing', 4, '06:30', '08:00', 24, 'Coach Saif'],
+  ['MMA Sparring', 'MMA', 5, '18:30', '20:00', 16, 'Coach Imran'],
+  ['Open Mat (BJJ)', 'BJJ', 6, '08:00', '09:30', 30, 'All Coaches'],
+];
 
-  const c = db.prepare('INSERT INTO courses (slug,name,tagline,description,image,sort) VALUES (?,?,?,?,?,?)');
-  courses.forEach((r) => c.run(...r));
+const videos = [
+  ['Jab-Cross Fundamentals', 'Boxing', 'Beginner', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg', '6:12', 1],
+  ['Teep & Roundhouse', 'Muay Thai', 'Beginner', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/ElephantsDream.jpg', '8:40', 2],
+  ['Closed Guard Basics', 'BJJ', 'Beginner', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerBlazes.jpg', '5:05', 3],
+  ['Double-Leg Takedown', 'Wrestling', 'Intermediate', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerEscapes.jpg', '7:18', 4],
+  ['MMA Clinch Work', 'MMA', 'Intermediate', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerFun.jpg', '9:50', 5],
+  ['Conditioning Circuit', 'CrossFit', 'All levels', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4', 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerJoyrides.jpg', '12:00', 6],
+];
 
-  const m = db.prepare('INSERT INTO memberships (name,type,price,duration,features,popular,sort) VALUES (?,?,?,?,?,?,?)');
-  memberships.forEach((r) => m.run(...r));
+async function seed() {
+  await db.init();
+  await db.run('DELETE FROM courses');
+  await db.run('DELETE FROM memberships');
+  await db.run('DELETE FROM trainers');
+  await db.run('DELETE FROM foods');
+  await db.run('DELETE FROM reviews');
+  await db.run('DELETE FROM events');
+  await db.run('DELETE FROM classes');
+  await db.run('DELETE FROM videos');
 
-  const t = db.prepare('INSERT INTO trainers (name,specialty,fee,bio,image) VALUES (?,?,?,?,?)');
-  trainers.forEach((r) => t.run(...r));
+  for (const r of courses) await db.run('INSERT INTO courses (slug,name,tagline,description,image,sort) VALUES ($1,$2,$3,$4,$5,$6)', r);
+  for (const r of memberships) await db.run('INSERT INTO memberships (name,type,price,duration,features,popular,sort) VALUES ($1,$2,$3,$4,$5,$6,$7)', r);
+  for (const r of trainers) await db.run('INSERT INTO trainers (name,specialty,fee,bio,image) VALUES ($1,$2,$3,$4,$5)', r);
+  for (const r of foods) await db.run('INSERT INTO foods (name,category,description,calories,protein,image,order_url) VALUES ($1,$2,$3,$4,$5,$6,$7)', r);
+  for (const r of reviews) await db.run('INSERT INTO reviews (author,rating,text,relative_time) VALUES ($1,$2,$3,$4)', r);
+  for (const r of events) await db.run('INSERT INTO events (title,description,event_date,location,image,status) VALUES ($1,$2,$3,$4,$5,$6)', r);
+  for (const r of classes) await db.run('INSERT INTO classes (title,discipline,day_of_week,start_time,end_time,capacity,coach) VALUES ($1,$2,$3,$4,$5,$6,$7)', r);
+  for (const r of videos) await db.run('INSERT INTO videos (title,discipline,level,url,thumbnail,duration,sort) VALUES ($1,$2,$3,$4,$5,$6,$7)', r);
 
-  const f = db.prepare('INSERT INTO foods (name,category,description,calories,protein,image,order_url) VALUES (?,?,?,?,?,?,?)');
-  foods.forEach((r) => f.run(...r));
+  console.log('✅ Seeded: courses, memberships, trainers, foods, reviews, events.');
+}
 
-  const rv = db.prepare('INSERT INTO reviews (author,rating,text,relative_time) VALUES (?,?,?,?)');
-  reviews.forEach((r) => rv.run(...r));
+module.exports = seed;
 
-  const e = db.prepare('INSERT INTO events (title,description,event_date,location,image,status) VALUES (?,?,?,?,?,?)');
-  events.forEach((r) => e.run(...r));
-});
-
-tx();
-console.log('✅ Seeded: courses, memberships, trainers, foods, reviews, events.');
+// Allow running directly: `node seed.js`
+if (require.main === module) {
+  seed().then(() => db.pool.end()).then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
+}

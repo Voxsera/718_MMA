@@ -29,7 +29,7 @@ export default function Events() {
                     <div className="body"><span className={`pill ${PILL[e.status]}`}>{e.status}</span>
                       <h3 style={{ marginTop: 12 }}>{e.title}</h3>
                       <p style={{ margin: '8px 0' }}>{e.description}</p>
-                      <p style={{ color: 'var(--red)', fontFamily: 'var(--cond)', letterSpacing: 1 }}>📅 {e.event_date} · {e.location}</p>
+                      <p style={{ color: 'var(--red)', fontFamily: 'var(--cond)', letterSpacing: 1 }}>{e.event_date} · {e.location}</p>
                     </div></div>
                 </Reveal>
               ))}

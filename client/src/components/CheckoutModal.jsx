@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api, inr } from '../api';
+import { useAuth } from '../auth.jsx';
 
 function loadRazorpay() {
   return new Promise((resolve) => {
@@ -13,26 +14,34 @@ function loadRazorpay() {
   });
 }
 
-// plan: {name, price}. onClose(success:boolean)
+const SESSIONS = [
+  'Session 1 · 6:30–8:00 AM',
+  'Session 2 · 8:00–9:30 AM',
+  'Session 3 · 6:30–8:00 PM',
+  'Session 4 · 8:00–9:30 PM',
+];
+
+// plan: {name, price}. onClose(success:boolean). Requires a logged-in user.
 export default function CheckoutModal({ plan, onClose }) {
-  const [form, setForm] = useState({ name: '', email: '', phone: '' });
+  const { user } = useAuth();
+  const [phone, setPhone] = useState('');
+  const [session, setSession] = useState(SESSIONS[0]);
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(false);
   if (!plan) return null;
-  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   const pay = async (e) => {
     e.preventDefault();
-    if (!form.email) { setMsg({ t: 'err', m: 'Email is required to activate your membership.' }); return; }
+    if (!session) { setMsg({ t: 'err', m: 'Please choose your training session.' }); return; }
     setBusy(true); setMsg(null);
-    const res = await api.post('/api/payment/order', { plan: plan.name, amount: plan.price, ...form });
+    const res = await api.post('/api/payment/order', { plan: plan.name, amount: plan.price, phone, session });
     if (res.error) { setBusy(false); setMsg({ t: 'err', m: res.error }); return; }
     const { order, key, mock } = res;
 
     if (mock) {
       await api.post('/api/payment/verify', { razorpay_order_id: order.id });
       setBusy(false);
-      setMsg({ t: 'ok', m: 'Test payment recorded (mock mode). Your membership is active — you can now log in with Google using ' + form.email + '. Add real Razorpay keys in .env for live UPI/cards.' });
+      setMsg({ t: 'ok', m: 'Test payment recorded (mock mode). Your membership is now active on this account. Add real Razorpay keys in .env for live UPI/cards.' });
       return;
     }
 
@@ -42,15 +51,14 @@ export default function CheckoutModal({ plan, onClose }) {
     const rzp = new window.Razorpay({
       key, amount: order.amount, currency: order.currency,
       name: '718 MMA Gym', description: plan.name + ' membership', order_id: order.id,
-      prefill: { name: form.name, email: form.email, contact: form.phone },
+      prefill: { name: user?.name || '', email: user?.email || '', contact: phone },
       theme: { color: '#e8112d' },
-      // UPI, cards, netbanking & wallets are all enabled; this keeps UPI first.
       config: { display: { sequence: ['block.upi', 'block.banks'], preferences: { show_default_blocks: true } } },
       handler: async (response) => {
         const v = await api.post('/api/payment/verify', response);
         setBusy(false);
         setMsg(v.ok
-          ? { t: 'ok', m: 'Payment successful! Your membership is active. Log in with Google using ' + form.email + '.' }
+          ? { t: 'ok', m: 'Payment successful! Your membership is now active on this account.' }
           : { t: 'err', m: 'Payment could not be verified.' });
       },
       modal: { ondismiss: () => setBusy(false) },
@@ -70,6 +78,7 @@ export default function CheckoutModal({ plan, onClose }) {
             <button onClick={() => onClose(msg?.t === 'ok')} style={{ background: 'none', border: 0, color: '#fff', fontSize: 22, cursor: 'pointer' }}>✕</button>
           </div>
           <p style={{ color: 'var(--red)', fontFamily: 'var(--display)', fontSize: 36 }}>{inr(plan.price)}</p>
+
           {msg?.t === 'ok' ? (
             <>
               <p className="form-msg ok">✅ {msg.m}</p>
@@ -77,10 +86,16 @@ export default function CheckoutModal({ plan, onClose }) {
             </>
           ) : (
             <form onSubmit={pay}>
-              <label>Full Name</label><input value={form.name} onChange={set('name')} required />
-              <label>Email *</label><input type="email" value={form.email} onChange={set('email')} required />
-              <label>Phone</label><input value={form.phone} onChange={set('phone')} />
-              <p style={{ color: 'var(--grey)', fontSize: 13, marginTop: 12 }}>Pay by UPI, card, netbanking or wallet via Razorpay. Your membership unlocks Google login.</p>
+              <p style={{ color: 'var(--grey-light)', fontSize: 14, marginTop: 4 }}>
+                Membership will be added to <b style={{ color: '#fff' }}>{user?.email}</b>. Use this same login in the 718 mobile app.
+              </p>
+              <label>Choose your daily session</label>
+              <select value={session} onChange={(e) => setSession(e.target.value)}>
+                {SESSIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <label>Phone (for the gym to reach you)</label>
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Optional" />
+              <p style={{ color: 'var(--grey)', fontSize: 13, marginTop: 12 }}>Pay by UPI, card, netbanking or wallet via Razorpay.</p>
               {msg?.t === 'err' && <p className="form-msg err">⚠️ {msg.m}</p>}
               <button className="btn btn-primary btn-block" style={{ marginTop: 14 }} disabled={busy}>
                 {busy ? 'Processing…' : `Pay ${inr(plan.price)}`}

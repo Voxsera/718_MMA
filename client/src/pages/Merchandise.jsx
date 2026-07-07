@@ -14,7 +14,7 @@ export default function Merchandise() {
             <input type="email" placeholder="Your email" required style={{ maxWidth: 280 }} />
             <button className="btn btn-primary">Notify Me</button>
           </form>
-          {done && <p className="form-msg ok" style={{ textAlign: 'center' }}>✅ You're on the list! We'll email you when merch drops.</p>}
+          {done && <p className="form-msg ok" style={{ textAlign: 'center' }}>You're on the list! We'll email you when merch drops.</p>}
         </div>
       </section>
     </PageHead>

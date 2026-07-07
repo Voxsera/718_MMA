@@ -42,7 +42,7 @@ export default function Trial() {
               </div>
               <label>Anything we should know?</label><textarea rows="3" value={form.message} onChange={set('message')} />
               <button className="btn btn-primary btn-block" style={{ marginTop: 18 }}>Book Free Trial →</button>
-              {msg && <p className={`form-msg ${msg.t}`}>{msg.t === 'ok' ? '✅ ' : '⚠️ '}{msg.m}</p>}
+              {msg && <p className={`form-msg ${msg.t}`}>{msg.m}</p>}
             </form>
           </Reveal>
         </div>

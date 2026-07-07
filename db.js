@@ -1,91 +1,109 @@
 /**
- * Database layer - uses Node's BUILT-IN SQLite (node:sqlite).
- * No native compilation, no npm dependency. Requires Node >= 22.5.
- * Exposes a tiny better-sqlite3-compatible API (prepare/run/get/all, exec, transaction).
+ * Database layer - Supabase / PostgreSQL via node-postgres (pg).
+ * Set DATABASE_URL in .env to your Supabase connection string.
+ * Exposes async helpers: get(one row), all(rows), run(result), init(schema).
  */
-const path = require('path');
+const { Pool } = require('pg');
 
-let DatabaseSync;
-try {
-  ({ DatabaseSync } = require('node:sqlite'));
-} catch (e) {
-  console.error('\n[718 MMA] Node\'s built-in SQLite is unavailable.');
-  console.error('Please use Node.js v22.5 or newer (LTS 22 or 24).  Current: ' + process.version + '\n');
-  throw e;
+const url = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL || '';
+const pool = new Pool({
+  connectionString: url,
+  ssl: !url || url.includes('localhost') ? false : { rejectUnauthorized: false },
+  max: 5,
+});
+
+const all = async (text, params = []) => (await pool.query(text, params)).rows;
+const get = async (text, params = []) => (await pool.query(text, params)).rows[0] || null;
+const run = async (text, params = []) => pool.query(text, params);
+
+async function init() {
+  if (!url) throw new Error('DATABASE_URL is not set. Add your Supabase connection string to .env');
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS courses (
+      id SERIAL PRIMARY KEY, slug TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
+      tagline TEXT, description TEXT, image TEXT, sort INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS events (
+      id SERIAL PRIMARY KEY, title TEXT NOT NULL, description TEXT, event_date TEXT,
+      location TEXT, image TEXT, status TEXT NOT NULL DEFAULT 'upcoming', created_at TIMESTAMPTZ DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS memberships (
+      id SERIAL PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'membership',
+      price INTEGER NOT NULL, duration TEXT, features TEXT, popular INTEGER DEFAULT 0, sort INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS trainers (
+      id SERIAL PRIMARY KEY, name TEXT NOT NULL, specialty TEXT, fee INTEGER, bio TEXT, image TEXT
+    );
+    CREATE TABLE IF NOT EXISTS foods (
+      id SERIAL PRIMARY KEY, name TEXT NOT NULL, category TEXT, description TEXT,
+      calories TEXT, protein TEXT, image TEXT, order_url TEXT
+    );
+    CREATE TABLE IF NOT EXISTS reviews (
+      id SERIAL PRIMARY KEY, author TEXT NOT NULL, rating INTEGER DEFAULT 5, text TEXT, relative_time TEXT
+    );
+    CREATE TABLE IF NOT EXISTS trial_bookings (
+      id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT, phone TEXT, discipline TEXT,
+      preferred_date TEXT, message TEXT, status TEXT DEFAULT 'new', created_at TIMESTAMPTZ DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS collaborations (
+      id SERIAL PRIMARY KEY, name TEXT NOT NULL, organization TEXT, email TEXT, phone TEXT,
+      type TEXT, message TEXT, status TEXT DEFAULT 'new', created_at TIMESTAMPTZ DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS payments (
+      id SERIAL PRIMARY KEY, name TEXT, email TEXT, phone TEXT, plan TEXT, amount INTEGER,
+      razorpay_order_id TEXT, razorpay_payment_id TEXT, status TEXT DEFAULT 'created', created_at TIMESTAMPTZ DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT, picture TEXT,
+      google_sub TEXT, password_hash TEXT, last_login TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS classes (
+      id SERIAL PRIMARY KEY, title TEXT NOT NULL, discipline TEXT, day_of_week INTEGER,
+      start_time TEXT, end_time TEXT, capacity INTEGER DEFAULT 20, coach TEXT, sort INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS class_bookings (
+      id SERIAL PRIMARY KEY, email TEXT NOT NULL, class_id INTEGER NOT NULL, slot_date TEXT,
+      status TEXT DEFAULT 'booked', created_at TIMESTAMPTZ DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS videos (
+      id SERIAL PRIMARY KEY, title TEXT NOT NULL, discipline TEXT, level TEXT,
+      url TEXT, thumbnail TEXT, duration TEXT, sort INTEGER DEFAULT 0, created_at TIMESTAMPTZ DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS video_state (
+      id SERIAL PRIMARY KEY, email TEXT NOT NULL, video_id INTEGER NOT NULL,
+      favorite INTEGER DEFAULT 0, progress_seconds INTEGER DEFAULT 0, updated_at TIMESTAMPTZ DEFAULT now(),
+      UNIQUE(email, video_id)
+    );
+    CREATE TABLE IF NOT EXISTS diet_posts (
+      id SERIAL PRIMARY KEY, title TEXT, image_url TEXT NOT NULL, note TEXT, created_at TIMESTAMPTZ DEFAULT now()
+    );
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY, value TEXT
+    );
+    CREATE TABLE IF NOT EXISTS user_memberships (
+      id SERIAL PRIMARY KEY, email TEXT NOT NULL, plan TEXT, amount INTEGER,
+      starts_at TIMESTAMPTZ DEFAULT now(), expires_at TIMESTAMPTZ, razorpay_order_id TEXT, created_at TIMESTAMPTZ DEFAULT now()
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS handovers (
+      id SERIAL PRIMARY KEY, amount INTEGER NOT NULL DEFAULT 0, note TEXT,
+      created_by TEXT, created_at TIMESTAMPTZ DEFAULT now()
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS renewal_reminders (
+      id SERIAL PRIMARY KEY, email TEXT, membership_id INTEGER, days_before INTEGER,
+      sent_at TIMESTAMPTZ DEFAULT now(), UNIQUE(membership_id, days_before)
+    );
+  `);
+  // --- Migrations (safe to run every boot) ---
+  await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS invoice_no TEXT`);
+  await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS method TEXT DEFAULT 'online'`);
+  await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS invoice_pdf BYTEA`);
+  await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS session TEXT`);
+  await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS session TEXT`);
+  await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS terminal_ref TEXT`);
 }
 
-const DB_FILE = process.env.DB_PATH || path.join(__dirname, 'data.db');
-const raw = new DatabaseSync(DB_FILE);
-try { raw.exec('PRAGMA journal_mode = WAL'); } catch { /* ignore */ }
-
-raw.exec(`
-  CREATE TABLE IF NOT EXISTS courses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
-    tagline TEXT, description TEXT, image TEXT, sort INTEGER DEFAULT 0
-  );
-  CREATE TABLE IF NOT EXISTS events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, description TEXT,
-    event_date TEXT, location TEXT, image TEXT, status TEXT NOT NULL DEFAULT 'upcoming',
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-  CREATE TABLE IF NOT EXISTS memberships (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'membership',
-    price INTEGER NOT NULL, duration TEXT, features TEXT, popular INTEGER DEFAULT 0, sort INTEGER DEFAULT 0
-  );
-  CREATE TABLE IF NOT EXISTS trainers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, specialty TEXT, fee INTEGER, bio TEXT, image TEXT
-  );
-  CREATE TABLE IF NOT EXISTS foods (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, category TEXT, description TEXT,
-    calories TEXT, protein TEXT, image TEXT, order_url TEXT
-  );
-  CREATE TABLE IF NOT EXISTS reviews (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, author TEXT NOT NULL, rating INTEGER DEFAULT 5, text TEXT, relative_time TEXT
-  );
-  CREATE TABLE IF NOT EXISTS trial_bookings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, email TEXT, phone TEXT, discipline TEXT,
-    preferred_date TEXT, message TEXT, status TEXT DEFAULT 'new', created_at TEXT DEFAULT (datetime('now'))
-  );
-  CREATE TABLE IF NOT EXISTS collaborations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, organization TEXT, email TEXT, phone TEXT,
-    type TEXT, message TEXT, status TEXT DEFAULT 'new', created_at TEXT DEFAULT (datetime('now'))
-  );
-  CREATE TABLE IF NOT EXISTS payments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT, phone TEXT, plan TEXT, amount INTEGER,
-    razorpay_order_id TEXT, razorpay_payment_id TEXT, status TEXT DEFAULT 'created', created_at TEXT DEFAULT (datetime('now'))
-  );
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE NOT NULL, name TEXT, picture TEXT,
-    google_sub TEXT, last_login TEXT, created_at TEXT DEFAULT (datetime('now'))
-  );
-  CREATE TABLE IF NOT EXISTS user_memberships (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL, plan TEXT, amount INTEGER,
-    starts_at TEXT DEFAULT (datetime('now')), expires_at TEXT, razorpay_order_id TEXT, created_at TEXT DEFAULT (datetime('now'))
-  );
-`);
-
-// better-sqlite3-compatible wrapper
-const db = {
-  prepare(sql) {
-    const s = raw.prepare(sql);
-    return {
-      run: (...a) => {
-        const r = s.run(...a);
-        return { changes: Number(r.changes), lastInsertRowid: Number(r.lastInsertRowid) };
-      },
-      get: (...a) => s.get(...a),
-      all: (...a) => s.all(...a),
-    };
-  },
-  exec: (sql) => raw.exec(sql),
-  pragma: () => {},
-  transaction(fn) {
-    return (...args) => {
-      raw.exec('BEGIN');
-      try { const r = fn(...args); raw.exec('COMMIT'); return r; }
-      catch (e) { try { raw.exec('ROLLBACK'); } catch {} throw e; }
-    };
-  },
-};
-
-module.exports = db;
+module.exports = { pool, all, get, run, init };

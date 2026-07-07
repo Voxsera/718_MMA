@@ -36,9 +36,13 @@ export default function Navbar() {
       }}
     >
       <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 72 }}>
-        <Link to="/" style={{ display: 'flex', flexDirection: 'column' }} onClick={() => setOpen(false)}>
-          <span style={{ fontFamily: 'Anton', fontStyle: 'italic', fontSize: 30, letterSpacing: '-1px', lineHeight: 1 }}>7<span style={{ color: 'var(--red)' }}>18</span></span>
-          <small style={{ fontFamily: 'var(--cond)', letterSpacing: 4, fontSize: 10, color: 'var(--grey)' }}>MMA CLUB</small>
+        <Link to="/" className="navBrand" onClick={() => setOpen(false)}>
+          <img src="/718mma-logo.png" alt="718 MMA Club" className="navBrandImg"
+            onError={(e) => { e.currentTarget.style.display = 'none'; const f = e.currentTarget.nextElementSibling; if (f) f.style.display = 'flex'; }} />
+          <span className="navBrandText" style={{ display: 'none', flexDirection: 'column' }}>
+            <span style={{ fontFamily: 'Anton', fontStyle: 'italic', fontSize: 30, letterSpacing: '-1px', lineHeight: 1 }}>7<span style={{ color: 'var(--red)' }}>18</span></span>
+            <small style={{ fontFamily: 'var(--cond)', letterSpacing: 4, fontSize: 10, color: 'var(--grey)' }}>MMA CLUB</small>
+          </span>
         </Link>
 
         <button className="navToggle" onClick={() => setOpen(!open)}
@@ -64,6 +68,9 @@ export default function Navbar() {
       </div>
 
       <style>{`
+        .navBrand{display:flex;align-items:center}
+        .navBrandImg{height:56px;width:108px;object-fit:cover;object-position:50% 47%;display:block;border-radius:5px}
+        @media(max-width:880px){.navBrandImg{height:48px;width:92px}}
         .navLinks{display:flex;align-items:center;gap:24px}
         .navItem{font-family:var(--cond);font-weight:600;letter-spacing:1.5px;text-transform:uppercase;font-size:14px;color:var(--grey-light);transition:.2s;white-space:nowrap}
         .navItem:hover,.navItem.active{color:#fff}
