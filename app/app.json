@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "718 MMA",
+    "slug": "718-mma",
+    "scheme": "mma718",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#050505",
+    "splash": { "backgroundColor": "#050505", "resizeMode": "contain" },
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.mma718.app" },
+    "android": { "package": "com.mma718.app" },
+    "plugins": ["expo-secure-store", "expo-av"]
+  }
+}

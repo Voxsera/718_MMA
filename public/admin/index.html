@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin CRM | 718 MMA Gym</title>
+  <link rel="icon" type="image/png" href="./favicon.png" />
+  <link rel="stylesheet" href="./admin.css" />
+</head>
+<body>
+  <!-- LOGIN -->
+  <div id="login">
+    <div class="login-box">
+      <div style="text-align:center;margin-bottom:8px"><img src="./718mma-logo.png" alt="718 MMA Club" style="width:180px;height:auto;display:block;margin:0 auto 6px" /><small style="font-family:var(--cond);letter-spacing:4px;color:var(--grey)">ADMIN · CRM</small></div>
+      <div class="form">
+        <h2 style="font-family:var(--cond);letter-spacing:1px;text-align:center">Admin Login</h2>
+        <p class="hint" style="text-align:center;margin:8px 0 18px">Sign in with an authorized Google account.</p>
+        <div id="gbtn" style="display:flex;justify-content:center;min-height:44px"></div>
+        <div class="form-msg err" id="lmsg" style="text-align:center"></div>
+        <form id="login-form" style="display:none;margin-top:18px">
+          <label>Username</label><input name="username" />
+          <label>Password</label><input type="password" name="password" />
+          <button class="btn btn-primary btn-block" style="margin-top:14px">Sign In →</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="admin-wrap" id="app" style="display:none">
+    <aside class="side">
+      <div class="brand"><img src="./718mma-logo.png" alt="718 MMA Club" style="width:140px;height:auto;display:block;margin:0 auto 4px" /><small style="font-family:var(--cond);letter-spacing:4px;font-size:10px;color:var(--grey)">ADMIN CRM</small><div id="role-badge" style="margin-top:6px;font-family:var(--cond);letter-spacing:2px;font-size:10px;color:var(--red);font-weight:700"></div></div>
+      <a data-v="dash" class="active">Dashboard</a>
+      <a data-v="events">Events</a>
+      <a data-v="trials">Trial Bookings</a>
+      <a data-v="collabs">Collaborations</a>
+      <a data-v="payments">Payments</a>
+      <a data-v="members">Members</a>
+      <a data-v="collections">Collections</a>
+      <a data-v="closure">Gym Closure</a>
+      <a data-v="classes">Classes</a>
+      <a data-v="videos">Videos</a>
+      <a data-v="diet">Diet Posts</a>
+      <a data-v="memberships">Plans</a>
+      <a href="/" style="color:var(--grey)">← Back To Site</a>
+      <a id="logout" style="color:var(--red)">Logout</a>
+    </aside>
+    <div class="side-overlay" id="side-overlay"></div>
+    <main class="main">
+      <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="menu-btn" id="menu-btn" aria-label="Menu">☰</button><h1 id="title" class="text-red">Dashboard</h1></div></div>
+      <section class="view active" id="v-dash">
+        <div class="seg" style="margin-top:0">Overview</div>
+        <div class="cards" id="stats"></div>
+        <div class="seg">Members By Session</div>
+        <div class="cards" id="dash-sessions"></div>
+        <div id="dash-today-wrap">
+          <div class="seg">Today's Payments</div>
+          <div class="cards" id="dash-today-cards" style="margin-bottom:18px"></div>
+          <div id="dash-today"></div>
+        </div>
+        <div class="seg">Latest Trial Bookings</div><div id="recent-trials"></div>
+      </section>
+      <section class="view" id="v-events">
+        <p class="hint" style="margin-bottom:14px">Status is <b style="color:#fff">automatic from the date</b> (India time): future = <b style="color:#fff">Upcoming</b>, today = <b style="color:#fff">Ongoing</b>, past = <b style="color:#fff">Past</b>. Just set the correct date.</p>
+        <button class="btn btn-outline mini" id="add-event" style="margin-bottom:16px;padding:10px 18px">+ Add Event</button>
+        <div id="events-table"></div>
+      </section>
+      <section class="view" id="v-trials">
+        <p class="hint" style="margin-bottom:14px">Trial requests from the website appear here. Add walk-ins who came in directly with <b style="color:#fff">+ Add Trial</b>.</p>
+        <button class="btn btn-outline mini" id="add-trial" style="margin-bottom:16px;padding:10px 18px">+ Add Trial</button>
+        <div id="trials-table"></div>
+      </section>
+      <section class="view" id="v-collabs">
+        <p class="hint" style="margin-bottom:14px">Collaboration requests from the website. Add your own with <b style="color:#fff">+ Add Collaborator</b>.</p>
+        <button class="btn btn-outline mini" id="add-collab" style="margin-bottom:16px;padding:10px 18px">+ Add Collaborator</button>
+        <div id="collabs-table"></div>
+      </section>
+      <section class="view" id="v-payments"><div id="payments-table"></div></section>
+      <section class="view" id="v-members">
+        <p class="hint" style="margin-bottom:14px">Membership is granted automatically on payment. Add walk-ins who paid offline with <b style="color:#fff">+ Add Member</b>, or <b style="color:#fff">Renew</b> an existing one — both generate an invoice and email it.</p>
+        <button class="btn btn-outline mini" id="add-member" style="margin-bottom:16px;padding:10px 18px">+ Add Member</button>
+        <div id="members-table"></div>
+      </section>
+      <section class="view" id="v-collections">
+        <p class="hint" style="margin-bottom:14px">Today's payments (cash + online) and the cash you're holding. Press <b style="color:#fff">Hand Over Cash</b> when you give the cash to the owner — the cash-in-hand resets to zero. If you don't, it carries over to the next day.</p>
+        <div class="cards" id="coll-cards" style="margin-bottom:22px"></div>
+        <div style="margin-bottom:22px">
+          <button class="btn btn-primary" id="handover-btn">Hand Over Cash To Owner</button>
+          <span class="hint" id="handover-info" style="margin-left:14px"></span>
+        </div>
+        <div class="seg">Today's Payments</div>
+        <div id="coll-table"></div>
+      </section>
+      <section class="view" id="v-closure">
+        <p class="hint" style="margin-bottom:14px">Set the gym closed for a day. When the date is <b style="color:#fff">today</b>, a banner shows on the website hero and members get an in-app notice. Clear the date to reopen.</p>
+        <div class="form" style="max-width:520px">
+          <label>Closed date — pick a day, or leave blank to reopen</label><input id="cl-date" type="date" />
+          <label>Message</label><input id="cl-msg" placeholder="Closed today for a private event." />
+          <button class="btn btn-primary" style="margin-top:16px" onclick="ADMIN.saveClosure()">Save</button>
+          <button class="btn btn-outline" style="margin-top:16px;margin-left:8px" onclick="ADMIN.clearClosure()">Reopen (clear)</button>
+          <div class="form-msg ok" id="cl-msg-out"></div>
+        </div>
+      </section>
+      <section class="view" id="v-classes">
+        <p class="hint" style="margin-bottom:14px">Weekly class schedule shown in the member app. Day: 0=Sun … 6=Sat.</p>
+        <button class="btn btn-outline mini" id="add-class" style="margin-bottom:16px;padding:10px 18px">+ Add Class</button>
+        <div id="classes-table"></div>
+      </section>
+      <section class="view" id="v-videos">
+        <p class="hint" style="margin-bottom:14px">Add videos as a <b style="color:#fff">link</b> (YouTube / hosted) or <b style="color:#fff">upload an .mp4 file</b>.</p>
+        <button class="btn btn-outline mini" id="add-video" style="margin-bottom:16px;padding:10px 18px">+ Add Video (link / YouTube)</button>
+        <div class="form" style="max-width:520px;margin-bottom:20px">
+          <h3 style="font-family:var(--cond);letter-spacing:1px;font-size:18px;margin-bottom:4px">Upload .mp4 file</h3>
+          <label>Title</label><input id="vf-title" placeholder="Jab-Cross drill" />
+          <label>Discipline</label><input id="vf-disc" placeholder="Boxing, MMA..." />
+          <label>Level</label>
+          <select id="vf-level"><option>Beginner</option><option>Intermediate</option><option>Advanced</option><option selected>All levels</option></select>
+          <label>Duration (optional)</label><input id="vf-dur" placeholder="e.g. 6:12" />
+          <label>Video file (.mp4)</label><input id="vf-file" type="file" accept="video/mp4,video/*" />
+          <label>Cover image (optional)</label><input id="vf-cover" type="file" accept="image/*" />
+          <button class="btn btn-primary" style="margin-top:16px" onclick="ADMIN.uploadVideoFile()">Upload Video</button>
+          <div class="form-msg" id="vf-out"></div>
+        </div>
+        <div id="videos-table"></div>
+      </section>
+      <section class="view" id="v-diet">
+        <p class="hint" style="margin-bottom:14px">Upload diet screenshots — they appear instantly in the member app. Stored in Supabase Storage.</p>
+        <div class="form" style="max-width:520px;margin-bottom:20px">
+          <label>Title</label><input id="diet-title" placeholder="Week 1 — Cutting plan" />
+          <label>Note (optional)</label><input id="diet-note" placeholder="Follow this Mon–Sat" />
+          <label>Image file</label><input id="diet-file" type="file" accept="image/*" />
+          <button class="btn btn-primary" style="margin-top:16px" onclick="ADMIN.uploadDiet()">Upload</button>
+          <div class="form-msg" id="diet-out"></div>
+        </div>
+        <div id="diet-table"></div>
+      </section>
+      <section class="view" id="v-memberships"><p class="hint" style="margin-bottom:14px">Edit plan prices — updates apply to the public site immediately.</p><div id="memberships-table"></div></section>
+    </main>
+  </div>
+  <div id="modal" class="modal-overlay">
+    <div class="modal-card">
+      <h3 id="modal-title">Add</h3>
+      <div id="modal-body"></div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="modal-cancel">Cancel</button>
+        <button class="btn btn-primary" id="modal-save">Save</button>
+      </div>
+    </div>
+  </div>
+  <script src="./admin.js"></script>
+</body>
+</html>
