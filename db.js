@@ -104,6 +104,8 @@ async function init() {
   await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS session TEXT`);
   await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS session TEXT`);
   await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS terminal_ref TEXT`);
+  await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS membership_id TEXT`);
+  await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS method TEXT`);
 }
 
 module.exports = { pool, all, get, run, init };

@@ -141,7 +141,18 @@ function planDuration(plan) {
   if (/1\s*month|monthly/.test(p)) return 30;
   return 30;
 }
-async function grantMembership(email, plan, amount, orderId, durationDays, session) {
+// Sequential member id like 718-001, 718-002 … (next = highest existing suffix + 1).
+async function nextMemberId() {
+  const r = await db.get("SELECT split_part(membership_id,'-',2) AS n FROM user_memberships WHERE membership_id ~ '^718-[0-9]+$' ORDER BY split_part(membership_id,'-',2)::int DESC LIMIT 1");
+  const n = r && r.n ? (parseInt(r.n, 10) || 0) : 0;
+  return '718-' + String(n + 1).padStart(3, '0');
+}
+// Members keep the same id across renewals.
+async function memberIdFor(email) {
+  const r = await db.get("SELECT membership_id FROM user_memberships WHERE email=$1 AND COALESCE(membership_id,'')<>'' ORDER BY created_at LIMIT 1", [email]);
+  return (r && r.membership_id) || await nextMemberId();
+}
+async function grantMembership(email, plan, amount, orderId, durationDays, session, method) {
   if (!email) return null;
   const e = email.toLowerCase();
   const days = durationDays || planDuration(plan);
@@ -149,14 +160,26 @@ async function grantMembership(email, plan, amount, orderId, durationDays, sessi
   const cur = await db.get("SELECT MAX(expires_at) m FROM user_memberships WHERE email=$1 AND expires_at > now()", [e]);
   const base = cur && cur.m ? new Date(cur.m).getTime() : Date.now();
   const expires = new Date(base + days * 86400000).toISOString();
-  await db.run('INSERT INTO user_memberships (email, plan, amount, expires_at, razorpay_order_id, session) VALUES ($1,$2,$3,$4,$5,$6)',
-    [e, plan, amount, expires, orderId || null, session || null]);
+  const memberId = await memberIdFor(e);
+  await db.run('INSERT INTO user_memberships (email, plan, amount, expires_at, razorpay_order_id, session, membership_id, method) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+    [e, plan, amount, expires, orderId || null, session || null, memberId, method || null]);
   return expires;
 }
 async function activeMembership(email) {
   if (!email) return null;
   return db.get("SELECT * FROM user_memberships WHERE email = $1 AND expires_at > now() ORDER BY expires_at DESC LIMIT 1",
     [email.toLowerCase()]);
+}
+// One-time: give any existing member without an ID a unique one (same id per email).
+async function backfillMemberIds() {
+  try {
+    const emails = await db.all("SELECT email, MIN(created_at) mc FROM user_memberships WHERE COALESCE(membership_id,'')='' GROUP BY email ORDER BY mc");
+    for (const row of emails) {
+      const mid = await memberIdFor(row.email);
+      await db.run("UPDATE user_memberships SET membership_id=$1 WHERE email=$2 AND COALESCE(membership_id,'')=''", [mid, row.email]);
+    }
+    if (emails.length) console.log(`[members] assigned IDs to ${emails.length} existing member(s)`);
+  } catch (e) { console.error('[members] backfill failed:', e.message); }
 }
 
 // ----- Invoicing -----
@@ -172,8 +195,9 @@ async function issueInvoice(payment, expiresAt) {
   const total = payment.amount || 0;
   const gst = Math.round(total * GST_RATE / 100); // e.g. 10000 -> 500
   const base = total - gst;                        // fees -> 9500
+  const mrow = await db.get("SELECT membership_id FROM user_memberships WHERE email=$1 AND COALESCE(membership_id,'')<>'' ORDER BY created_at DESC LIMIT 1", [payment.email]);
   const data = {
-    invoiceNo, name: payment.name, email: payment.email, phone: payment.phone,
+    invoiceNo, memberId: mrow ? mrow.membership_id : '', name: payment.name, email: payment.email, phone: payment.phone,
     plan: payment.plan, amount: total, base, gst, gstRate: GST_RATE, method: payment.method || 'online',
     paymentId: payment.razorpay_payment_id || null, date: payment.created_at || new Date(), expiresAt,
   };
@@ -191,7 +215,7 @@ async function recordMembershipPayment({ name, email, phone, plan, amount, metho
   const pay = await db.get(
     "INSERT INTO payments (name,email,phone,plan,amount,status,method,session) VALUES ($1,$2,$3,$4,$5,'paid',$6,$7) RETURNING *",
     [name || '', e, phone || '', plan || 'Membership', amt, method || 'offline', session || null]);
-  const expires = await grantMembership(e, plan, amt, null, durationDays, session);
+  const expires = await grantMembership(e, plan, amt, null, durationDays, session, method || 'offline');
   const inv = await issueInvoice(pay, expires);
   return { payment: pay, expires, invoiceNo: inv.invoiceNo };
 }
@@ -388,7 +412,7 @@ app.post('/api/payment/verify', h(async (req, res) => {
   await db.run('UPDATE payments SET razorpay_payment_id = $1, status = $2 WHERE razorpay_order_id = $3',
     [razorpay_payment_id || 'mock_pay', verified ? 'paid' : 'failed', razorpay_order_id]);
   if (verified && pay) {
-    const expires = await grantMembership(pay.email, pay.plan, pay.amount, razorpay_order_id, undefined, pay.session);
+    const expires = await grantMembership(pay.email, pay.plan, pay.amount, razorpay_order_id, undefined, pay.session, pay.method || 'online');
     const fresh = await db.get('SELECT * FROM payments WHERE id=$1', [pay.id]);
     await issueInvoice(fresh, expires); // generates PDF + emails member
   }
@@ -622,11 +646,14 @@ app.post('/api/admin/members/import', requireOwner, upload.single('file'), h(asy
     const startISO = toISO(pick(r, 'startdate', 'joindate', 'startingdate', 'joiningdate')) || new Date().toISOString();
     let expISO = toISO(pick(r, 'expirydate', 'expiry', 'enddate', 'validtill', 'expirationdate'));
     if (!expISO) expISO = new Date(new Date(startISO).getTime() + planDuration(plan) * 86400000).toISOString();
+    let memberId = pick(r, 'membershipid', 'memberid', 'id');
+    if (!memberId) memberId = await memberIdFor(email);
+    const mode = pick(r, 'paymentmode', 'modeofpayment', 'mode', 'method', 'paymentmethod') || 'import';
     try {
-      await db.run('INSERT INTO user_memberships (email, plan, amount, starts_at, expires_at, session) VALUES ($1,$2,$3,$4,$5,$6)',
-        [email, plan, amount, startISO, expISO, session || null]);
-      await db.run("INSERT INTO payments (name,email,phone,plan,amount,status,method,session,created_at) VALUES ($1,$2,$3,$4,$5,'paid','import',$6,$7)",
-        [name || '', email, phone || '', plan, amount, session || null, startISO]);
+      await db.run('INSERT INTO user_memberships (email, plan, amount, starts_at, expires_at, session, membership_id, method) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
+        [email, plan, amount, startISO, expISO, session || null, memberId, mode]);
+      await db.run("INSERT INTO payments (name,email,phone,plan,amount,status,method,session,created_at) VALUES ($1,$2,$3,$4,$5,'paid',$6,$7,$8)",
+        [name || '', email, phone || '', plan, amount, mode, session || null, startISO]);
       imported++;
     } catch (e) { skipped++; errors.push(`Row ${i + 2} (${email}): ${e.message}`); }
   }
@@ -717,7 +744,7 @@ app.post('/api/worldline/webhook', h(async (req, res) => {
   if (approved) {
     await db.run("UPDATE payments SET status='paid', razorpay_payment_id=$1 WHERE terminal_ref=$2", [transactionId || 'terminal', reference]);
     const fresh = await db.get('SELECT * FROM payments WHERE terminal_ref=$1', [reference]);
-    const expires = await grantMembership(fresh.email, fresh.plan, fresh.amount, null, undefined, fresh.session);
+    const expires = await grantMembership(fresh.email, fresh.plan, fresh.amount, null, undefined, fresh.session, fresh.method || 'online');
     await issueInvoice(fresh, expires); // GST invoice + email
   } else {
     await db.run("UPDATE payments SET status='failed' WHERE terminal_ref=$1", [reference]);
@@ -856,6 +883,7 @@ if (fs.existsSync(clientDist)) {
 // ----------------------------- Startup ------------------------------------
 (async () => {
   await db.init();
+  await backfillMemberIds(); // give existing members a Member ID
   const c = await db.get('SELECT COUNT(*)::int n FROM courses');
   if (!c || !c.n) { console.log('Empty DB - seeding demo content...'); await require('./seed')(); }
   app.listen(PORT, () => {
@@ -863,7 +891,7 @@ if (fs.existsSync(clientDist)) {
     console.log(`   Admin CRM:  http://localhost:${PORT}/admin`);
     console.log(`   Database:   Supabase/Postgres`);
     console.log(`   Google:     ${GOOGLE_CLIENT_ID ? 'configured' : 'NOT set'}  |  Razorpay: ${RZP_LIVE ? 'LIVE test keys' : 'MOCK mode'}`);
-    console.log(`   Email:      ${mailerReady ? 'configured (invoices + renewal reminders)' : 'NOT set'}\n`);
+    console.log(`   Email:      ${mailerReady ? 'via ' + require('./mailer').provider + ' (invoices + renewal reminders)' : 'NOT set'}\n`);
   });
   // Renewal reminders: run shortly after boot, then every 6 hours (deduped so no spam).
   if (mailerReady) {

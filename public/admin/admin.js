@@ -318,10 +318,11 @@
       const manage = ROLE === 'coach' ? '—'
         : `<button class="mini" onclick="ADMIN.renewMember(${m.id})">Renew</button>`
           + (ROLE === 'owner' ? ` <button class="mini" onclick="ADMIN.delMember(${m.id}, '${(m.email || '').replace(/'/g, '')}')">Delete</button>` : '');
-      return `<tr><td>${m.email}</td><td>${m.plan || '-'}</td><td>${m.session || '-'}</td><td>${inr(m.amount)}</td><td>${(m.expires_at || '').slice(0, 10)}</td><td>${badge(active ? 'paid' : 'past')}</td>
+      const mode = m.method === 'cash' ? 'Cash' : (m.method ? (m.method.charAt(0).toUpperCase() + m.method.slice(1)) : '-');
+      return `<tr><td><b style="color:#fff">${m.membership_id || '-'}</b></td><td>${m.email}</td><td>${m.plan || '-'}</td><td>${m.session || '-'}</td><td>${inr(m.amount)}</td><td>${mode}</td><td>${(m.expires_at || '').slice(0, 10)}</td><td>${badge(active ? 'paid' : 'past')}</td>
         <td>${manage}</td></tr>`;
     });
-    $('#members-table').innerHTML = rows.length ? tbl(['Email', 'Plan', 'Session', 'Paid', 'Expires', 'Status', 'Manage'], rows) : '<p class="hint">No members yet. Memberships appear here after a successful payment.</p>';
+    $('#members-table').innerHTML = rows.length ? tbl(['Member ID', 'Email', 'Plan', 'Session', 'Paid', 'Mode', 'Expires', 'Status', 'Manage'], rows) : '<p class="hint">No members yet. Memberships appear here after a successful payment.</p>';
   }
   $('#add-member').addEventListener('click', async () => {
     const plans = await getPlans();

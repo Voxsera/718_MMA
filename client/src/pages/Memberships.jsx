@@ -11,7 +11,7 @@ export default function Memberships() {
   const [selected, setSelected] = useState(null);
   const { user, refresh } = useAuth();
   const navigate = useNavigate();
-  const buy = (p) => { if (!user) { navigate('/login', { state: { from: '/' + window.location.pathname.split('/').pop() } }); return; } setSelected({ name: p.name, price: p.price }); };
+  const buy = (p) => setSelected({ name: p.name, price: p.price }); // memberships are purchased at the gym
   useEffect(() => { api.get('/api/memberships').then((m) => setPlans(m.filter((x) => x.type === 'membership'))).catch(() => {}); }, []);
 
   // Group plans by category parsed from the name ("MMA — 1 Month" -> "MMA").

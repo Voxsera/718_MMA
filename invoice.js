@@ -46,10 +46,12 @@ function generateInvoicePdf(data = {}) {
       let y = 120;
       doc.fillColor(GREY).font('Helvetica').fontSize(10);
       doc.text('Invoice No.', R - 220, y, { width: 100, align: 'left' });
-      doc.text('Date', R - 220, y + 16, { width: 100, align: 'left' });
+      doc.text('Member ID', R - 220, y + 16, { width: 100, align: 'left' });
+      doc.text('Date', R - 220, y + 32, { width: 100, align: 'left' });
       doc.fillColor(INK).font('Helvetica-Bold');
       doc.text(data.invoiceNo || '—', R - 120, y, { width: 120, align: 'right' });
-      doc.text(fmtDate(data.date), R - 120, y + 16, { width: 120, align: 'right' });
+      doc.text(data.memberId || '—', R - 120, y + 16, { width: 120, align: 'right' });
+      doc.text(fmtDate(data.date), R - 120, y + 32, { width: 120, align: 'right' });
 
       // ---- Billed to ----
       doc.fillColor(GREY).font('Helvetica').fontSize(10).text('BILLED TO', L, y);
