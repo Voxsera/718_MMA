@@ -2,7 +2,7 @@
 // Find it on Windows with `ipconfig` (IPv4 Address), e.g. 192.168.1.5
 // Phone and PC must be on the SAME Wi-Fi. Do NOT use "localhost" (that's the phone itself).
 // export const API_URL = 'http://172.19.80.1:3000';
-export const API_URL = 'http://10.98.150.175:3000';
+export const API_URL = 'http://192.168.1.37:3000';
 // Renew/membership opens this site in the browser (Razorpay web checkout). Usually same as API_URL.
 export const WEBSITE_URL = API_URL;
 
@@ -11,3 +11,8 @@ export const WEBSITE_URL = API_URL;
 export const GOOGLE_WEB_CLIENT_ID = '';
 export const GOOGLE_ANDROID_CLIENT_ID = '';
 export const GOOGLE_IOS_CLIENT_ID = '';
+
+
+
+// GOOGLE_CLIENT_ID=486216753423-4pu6ek2hog2askatfus92qesiaf3ha4o.apps.googleusercontent.com
+// GOOGLE_CLIENT_SECRET=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
