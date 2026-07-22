@@ -79,6 +79,13 @@
       <section class="view" id="v-members">
         <p class="hint" style="margin-bottom:14px">Membership is granted automatically on payment. Add walk-ins who paid offline with <b style="color:#fff">+ Add Member</b>, or <b style="color:#fff">Renew</b> an existing one — both generate an invoice and email it.</p>
         <button class="btn btn-outline mini" id="add-member" style="margin-bottom:16px;padding:10px 18px">+ Add Member</button>
+        <div class="form" id="import-box" style="max-width:660px;margin:0 0 20px">
+          <h3 style="font-family:var(--cond);letter-spacing:1px;font-size:18px;margin-bottom:4px">Import existing members from Excel</h3>
+          <p class="hint" style="margin:6px 0 12px">First row = column headers. Columns: <b style="color:#fff">name, email, phone, plan, session, amount, start_date, expiry_date</b>. Only <b style="color:#fff">email</b> is required. Dates as <b style="color:#fff">YYYY-MM-DD</b>. No emails/invoices are sent for imported members.</p>
+          <input id="import-file" type="file" accept=".xlsx,.xls,.csv" />
+          <button class="btn btn-primary" style="margin-top:12px" onclick="ADMIN.importMembers()">Import Sheet</button>
+          <div class="form-msg" id="import-out"></div>
+        </div>
         <div id="members-table"></div>
       </section>
       <section class="view" id="v-collections">

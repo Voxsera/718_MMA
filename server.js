@@ -585,6 +585,53 @@ app.post('/api/admin/members', requireAdmin, h(async (req, res) => {
     durationDays: durationDays ? parseInt(durationDays, 10) : undefined });
   res.json({ ok: true, expires: r.expires, invoiceNo: r.invoiceNo, emailed: mailerReady });
 }));
+// Delete a member and ALL their data (memberships + payments) by membership id. Owner only.
+app.delete('/api/admin/members/:id', requireOwner, h(async (req, res) => {
+  const m = await db.get('SELECT email FROM user_memberships WHERE id=$1', [req.params.id]);
+  if (!m) return res.status(404).json({ error: 'Member not found.' });
+  await db.run('DELETE FROM user_memberships WHERE email=$1', [m.email]);
+  await db.run('DELETE FROM payments WHERE email=$1', [m.email]);
+  res.json({ ok: true, email: m.email });
+}));
+// Delete a single payment record. Owner only.
+app.delete('/api/admin/payments/:id', requireOwner, h(async (req, res) => {
+  await db.run('DELETE FROM payments WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
+}));
+// Bulk import existing members from an Excel/CSV sheet. Owner only. No emails/invoices sent.
+app.post('/api/admin/members/import', requireOwner, upload.single('file'), h(async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Upload an .xlsx or .csv file.' });
+  let XLSX; try { XLSX = require('xlsx'); } catch (e) { return res.status(500).json({ error: 'Excel library not installed. Run npm install.' }); }
+  let rows;
+  try {
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false });
+  } catch (e) { return res.status(400).json({ error: 'Could not read the sheet: ' + e.message }); }
+  const pick = (o, ...keys) => { for (const k of Object.keys(o)) { const kk = k.toLowerCase().trim().replace(/[\s_]+/g, ''); if (keys.includes(kk)) return String(o[k]).trim(); } return ''; };
+  const toISO = (s) => { if (!s) return null; const d = new Date(s); return isNaN(d) ? null : d.toISOString(); };
+  let imported = 0, skipped = 0; const errors = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const email = pick(r, 'email', 'emailid', 'mail').toLowerCase();
+    if (!email) { skipped++; errors.push(`Row ${i + 2}: no email`); continue; }
+    const name = pick(r, 'name', 'membername', 'fullname');
+    const phone = pick(r, 'phone', 'mobile', 'contact', 'phonenumber');
+    const plan = pick(r, 'plan', 'membership', 'plantype') || 'Membership';
+    const session = pick(r, 'session', 'batch', 'slot');
+    const amount = parseInt(pick(r, 'amount', 'amountpaid', 'fees', 'fee').replace(/[^\d]/g, ''), 10) || 0;
+    const startISO = toISO(pick(r, 'startdate', 'joindate', 'startingdate', 'joiningdate')) || new Date().toISOString();
+    let expISO = toISO(pick(r, 'expirydate', 'expiry', 'enddate', 'validtill', 'expirationdate'));
+    if (!expISO) expISO = new Date(new Date(startISO).getTime() + planDuration(plan) * 86400000).toISOString();
+    try {
+      await db.run('INSERT INTO user_memberships (email, plan, amount, starts_at, expires_at, session) VALUES ($1,$2,$3,$4,$5,$6)',
+        [email, plan, amount, startISO, expISO, session || null]);
+      await db.run("INSERT INTO payments (name,email,phone,plan,amount,status,method,session,created_at) VALUES ($1,$2,$3,$4,$5,'paid','import',$6,$7)",
+        [name || '', email, phone || '', plan, amount, session || null, startISO]);
+      imported++;
+    } catch (e) { skipped++; errors.push(`Row ${i + 2} (${email}): ${e.message}`); }
+  }
+  res.json({ ok: true, imported, skipped, total: rows.length, errors: errors.slice(0, 20) });
+}));
 // Renew a member's subscription (offline). Extends expiry from current end date.
 app.post('/api/admin/members/:id/renew', requireAdmin, h(async (req, res) => {
   const m = await db.get('SELECT * FROM user_memberships WHERE id=$1', [req.params.id]);

@@ -25,6 +25,9 @@
     // Coach views members but can't add/renew (money actions).
     const addMemberBtn = document.getElementById('add-member');
     if (addMemberBtn) addMemberBtn.style.display = ROLE === 'coach' ? 'none' : '';
+    // Excel import is owner-only.
+    const impBox = document.getElementById('import-box');
+    if (impBox) impBox.style.display = ROLE === 'owner' ? '' : 'none';
     if (cfg) {
       const side = document.querySelector('.side');
       let anchor = side.querySelector('.brand');
@@ -292,8 +295,15 @@
   });
 
   async function loadPayments() {
-    const rows = (await api.get('/api/admin/payments') || []).map((p) => `<tr><td>${p.name || '-'}<br><span class="hint">${p.email || ''} ${p.phone || ''}</span></td><td>${p.plan || '-'}</td><td>${inr(p.amount)}</td><td>${badge(p.status)}</td><td class="hint">${(p.created_at || '').slice(0,10)}</td><td>${p.status === 'paid' ? `<a class="mini" style="text-decoration:none" href="/api/admin/payments/${p.id}/invoice" target="_blank">Invoice</a>` : '-'}</td></tr>`);
-    $('#payments-table').innerHTML = rows.length ? tbl(['Customer', 'Plan', 'Amount', 'Status', 'When', 'Invoice'], rows) : '<p class="hint">No payments yet.</p>';
+    const rows = (await api.get('/api/admin/payments') || []).map((p) => `<tr><td>${p.name || '-'}<br><span class="hint">${p.email || ''} ${p.phone || ''}</span></td><td>${p.plan || '-'}</td><td>${inr(p.amount)}</td><td>${badge(p.status)}</td><td class="hint">${(p.created_at || '').slice(0,10)}</td><td>${p.status === 'paid' ? `<a class="mini" style="text-decoration:none" href="/api/admin/payments/${p.id}/invoice" target="_blank">Invoice</a>` : '-'} <button class="mini" onclick="ADMIN.delPayment(${p.id})">Delete</button></td></tr>`);
+    $('#payments-table').innerHTML = rows.length ? tbl(['Customer', 'Plan', 'Amount', 'Status', 'When', 'Manage'], rows) : '<p class="hint">No payments yet.</p>';
+  }
+  async function delPayment(id) {
+    const ok = await confirmModal('Delete payment', 'Delete this payment record? This cannot be undone.', 'Delete');
+    if (!ok) return;
+    const r = await api.send('/api/admin/payments/' + id, 'DELETE');
+    if (!r.ok) await notifyModal('Failed', r.error || 'Could not delete.');
+    loadPayments();
   }
 
   // Fetch plans -> [{name, price, duration}] for select menus.
@@ -305,7 +315,9 @@
     _members = (await api.get('/api/admin/members') || []);
     const rows = _members.map((m) => {
       const active = new Date(m.expires_at) > new Date();
-      const manage = ROLE === 'coach' ? '—' : `<button class="mini" onclick="ADMIN.renewMember(${m.id})">Renew</button>`;
+      const manage = ROLE === 'coach' ? '—'
+        : `<button class="mini" onclick="ADMIN.renewMember(${m.id})">Renew</button>`
+          + (ROLE === 'owner' ? ` <button class="mini" onclick="ADMIN.delMember(${m.id}, '${(m.email || '').replace(/'/g, '')}')">Delete</button>` : '');
       return `<tr><td>${m.email}</td><td>${m.plan || '-'}</td><td>${m.session || '-'}</td><td>${inr(m.amount)}</td><td>${(m.expires_at || '').slice(0, 10)}</td><td>${badge(active ? 'paid' : 'past')}</td>
         <td>${manage}</td></tr>`;
     });
@@ -356,6 +368,27 @@
     if (r.ok) await notifyModal('Membership renewed', `Valid until <b style="color:#fff">${(r.expires || '').slice(0, 10)}</b>. Invoice <b style="color:#fff">${r.invoiceNo}</b> ${r.emailed ? 'emailed.' : '(email not configured).'}`);
     else await notifyModal('Failed', r.error || 'Could not renew.');
     loadMembers();
+  }
+  async function delMember(id, email) {
+    const ok = await confirmModal('Delete member', `Delete <b style="color:#fff">${email}</b> and <b style="color:#fff">all their memberships and payments</b>? This cannot be undone.`, 'Delete');
+    if (!ok) return;
+    const r = await api.send('/api/admin/members/' + id, 'DELETE');
+    if (!r.ok) await notifyModal('Failed', r.error || 'Could not delete.');
+    loadMembers();
+  }
+  async function importMembers() {
+    const file = document.getElementById('import-file').files[0];
+    const out = document.getElementById('import-out');
+    if (!file) { out.className = 'form-msg err'; out.textContent = '⚠️ Choose an .xlsx or .csv file first.'; return; }
+    const fd = new FormData(); fd.append('file', file);
+    out.className = 'form-msg'; out.textContent = 'Importing…';
+    const r = await fetch('/api/admin/members/import', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (j.ok) {
+      out.className = 'form-msg ok';
+      out.innerHTML = `✅ Imported <b>${j.imported}</b> of ${j.total}. ${j.skipped ? 'Skipped ' + j.skipped + '.' : ''}` + (j.errors && j.errors.length ? '<br><span class="hint">' + j.errors.join('<br>') + '</span>' : '');
+      document.getElementById('import-file').value = ''; loadMembers();
+    } else { out.className = 'form-msg err'; out.textContent = '⚠️ ' + (j.error || 'Import failed.'); }
   }
 
   // ---- Collections & cash handover ----
@@ -495,7 +528,7 @@
     else { out.className = 'form-msg err'; out.textContent = '⚠️ ' + (j.error || 'Upload failed.'); }
   }
 
-  window.ADMIN = { setEventStatus, editEvent, delEvent, setTrial, setCollab, editPlan, renewMember, saveClosure, clearClosure, delClass, delVideo, delDiet, uploadDiet, uploadVideoFile };
+  window.ADMIN = { setEventStatus, editEvent, delEvent, setTrial, setCollab, editPlan, renewMember, delMember, delPayment, importMembers, saveClosure, clearClosure, delClass, delVideo, delDiet, uploadDiet, uploadVideoFile };
   initLogin();
   checkAuth();
 })();
