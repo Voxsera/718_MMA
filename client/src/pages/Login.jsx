@@ -11,6 +11,7 @@ export default function Login() {
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [showPw, setShowPw] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const dest = location.state?.from || '/dashboard';
@@ -58,7 +59,25 @@ export default function Login() {
                   <label>Email *</label>
                   <input type="email" value={form.email} onChange={set('email')} required placeholder="you@email.com" />
                   <label>Password *</label>
-                  <input type="password" value={form.password} onChange={set('password')} required placeholder={mode === 'register' ? 'At least 6 characters' : 'Your password'} />
+                  <div style={{ position: 'relative' }}>
+                    <input type={showPw ? 'text' : 'password'} value={form.password} onChange={set('password')} required placeholder={mode === 'register' ? 'At least 6 characters' : 'Your password'} style={{ paddingRight: 44, width: '100%' }} />
+                    <button type="button" onClick={() => setShowPw(v => !v)} aria-label={showPw ? 'Hide password' : 'Show password'}
+                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--grey)', display: 'flex', alignItems: 'center' }}>
+                      {showPw ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                          <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+                          <line x1="1" y1="1" x2="23" y2="23" />
+                        </svg>
+                      ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                   <button className="btn btn-primary btn-block" style={{ marginTop: 18 }} disabled={busy}>
                     {busy ? 'Please wait…' : mode === 'register' ? 'Create Account →' : 'Sign In →'}
                   </button>

@@ -11,8 +11,3 @@ export const WEBSITE_URL = API_URL;
 export const GOOGLE_WEB_CLIENT_ID = '';
 export const GOOGLE_ANDROID_CLIENT_ID = '';
 export const GOOGLE_IOS_CLIENT_ID = '';
-
-
-
-// GOOGLE_CLIENT_ID=486216753423-4pu6ek2hog2askatfus92qesiaf3ha4o.apps.googleusercontent.com
-// GOOGLE_CLIENT_SECRET=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

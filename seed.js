@@ -5,18 +5,19 @@
  * Wipes and reloads the seed tables (courses/memberships/trainers/foods/reviews/events);
  * it does NOT touch bookings, payments, users or memberships.
  */
+require('dotenv').config();
 const db = require('./db');
 
 const img = (id) => `https://images.unsplash.com/${id}?w=900&q=70&auto=format&fit=crop`;
 
 const courses = [
-  ['mma', 'MMA', 'Mixed Martial Arts', 'The complete combat discipline — striking, grappling and ground game blended into one. Train like a fighter, build real confidence.', img('photo-1605296867304-46d5465a13f1'), 1],
-  ['muay-thai', 'Muay Thai', 'The Art of Eight Limbs', 'Fists, elbows, knees and shins. Sharpen your stand-up game with authentic Thai boxing under experienced coaches.', img('photo-1549719386-74dfcbf7dbed'), 2],
-  ['kickboxing', 'Kickboxing', 'Power & Cardio', 'Explosive kicks and punches with high-intensity conditioning. Burn fat, build power, learn to fight.', img('photo-1517438476312-10d79c077509'), 3],
-  ['boxing', 'Boxing', 'The Sweet Science', 'Footwork, head movement and crisp punches. From first-timers to competitors, build hands of stone.', img('photo-1599058917212-d750089bc07e'), 4],
-  ['jujutsu', 'Jujutsu', 'Traditional Grappling', 'Classic Japanese jujutsu — joint locks, throws and self-defense fundamentals for every body type.', img('photo-1555597673-b21d5c935865'), 5],
-  ['wrestling', 'Wrestling', 'Takedowns & Control', 'Olympic-style wrestling. Master takedowns, scrambles and top control — the backbone of MMA.', img('photo-1517649763962-0c623066013b'), 7],
-  ['crossfit', 'CrossFit', 'Functional Strength', 'Strength and conditioning built for fighters and everyone else. Move better, hit harder, last longer.', img('photo-1534438327276-14e5300c3a48'), 8],
+  ['mma', 'MMA', 'Mixed Martial Arts', 'The complete combat discipline — striking, grappling and ground game blended into one. Train like a fighter, build real confidence.', '/course-mma.png', 1],
+  ['muay-thai', 'Muay Thai', 'The Art of Eight Limbs', 'Fists, elbows, knees and shins. Sharpen your stand-up game with authentic Thai boxing under experienced coaches.', '/course-muay-thai.png', 2],
+  ['kickboxing', 'Kickboxing', 'Power & Cardio', 'Explosive kicks and punches with high-intensity conditioning. Burn fat, build power, learn to fight.', '/course-kickboxing.png', 3],
+  ['boxing', 'Boxing', 'The Sweet Science', 'Footwork, head movement and crisp punches. From first-timers to competitors, build hands of stone.', '/course-boxing.png', 4],
+  ['jujutsu', 'Jujutsu', 'Traditional Grappling', 'Classic Japanese jujutsu — joint locks, throws and self-defense fundamentals for every body type.', '/course-jujutsu.png', 5],
+  ['wrestling', 'Wrestling', 'Takedowns & Control', 'Olympic-style wrestling. Master takedowns, scrambles and top control — the backbone of MMA.', '/course-wrestling.png', 7],
+  ['crossfit', 'CrossFit', 'Functional Strength', 'Strength and conditioning built for fighters and everyone else. Move better, hit harder, last longer.', '/course-crossfit.png', 8],
 ];
 
 const memberships = [

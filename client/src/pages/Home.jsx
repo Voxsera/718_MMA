@@ -65,9 +65,9 @@ export default function Home() {
               <Link to="/trial" className="btn btn-primary">Claim Free Trial →</Link>
               <Link to="/courses" className="btn btn-outline">Explore Courses</Link>
             </div>
-            <div style={{ display: 'flex', gap: 40, marginTop: 42, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 'clamp(20px, 4vw, 40px)', marginTop: 42, flexWrap: 'wrap' }}>
               {[['8', 'Disciplines'], ['4', 'Daily Sessions'], ['18hrs', 'Open Daily'], ['1', 'Free Trial Day']].map(([n, l]) => (
-                <div key={l}><b style={{ fontFamily: 'var(--display)', fontSize: 42, display: 'block', lineHeight: 1 }}>{n}</b>
+                <div key={l}><b style={{ fontFamily: 'var(--display)', fontSize: 'clamp(30px, 6vw, 42px)', display: 'block', lineHeight: 1 }}>{n}</b>
                   <span style={{ fontFamily: 'var(--cond)', letterSpacing: 2, textTransform: 'uppercase', color: 'var(--grey)', fontSize: 13 }}>{l}</span></div>
               ))}
             </div>
@@ -82,7 +82,7 @@ export default function Home() {
       {/* ABOUT + TIMINGS */}
       <section style={{ background: 'var(--ink)' }}>
         <div className="container split">
-          <Reveal><img src="https://images.unsplash.com/photo-1599058917212-d750089bc07e?w=900&q=70&auto=format&fit=crop" alt="718 MMA" style={{ height: 480, objectFit: 'cover', width: '100%' }} /></Reveal>
+          <Reveal><img src="https://images.unsplash.com/photo-1599058917212-d750089bc07e?w=900&q=70&auto=format&fit=crop" alt="718 MMA" style={{ height: 'clamp(260px, 70vw, 480px)', objectFit: 'cover', width: '100%' }} /></Reveal>
           <Reveal delay={0.1}>
             <div className="section-label">About Us</div>
             <h2 className="section-title">Seven One Eight <span className="text-red">Active MMA</span></h2>
@@ -132,7 +132,7 @@ export default function Home() {
             <Link to="/trial" className="btn btn-primary" style={{ marginTop: 28 }}>Book Free Trial →</Link>
           </Reveal>
           <Reveal delay={0.1}>
-            <img src="https://images.unsplash.com/photo-1517438476312-10d79c077509?w=900&q=70&auto=format&fit=crop" alt="Trial" style={{ height: 440, objectFit: 'cover', width: '100%' }} />
+            <img src="https://images.unsplash.com/photo-1549476464-37392f717541?w=900&q=70&auto=format&fit=crop" alt="Trial training at 718 MMA" style={{ height: 'clamp(260px, 70vw, 440px)', objectFit: 'cover', width: '100%' }} />
           </Reveal>
         </div>
       </section>
@@ -170,7 +170,7 @@ export default function Home() {
             <p className="section-intro">Your event. Our arena. Whether it's a tournament, workshop, fitness challenge or private gathering, we've got the space. We offer day-based venue rentals for combat sports events and live experiences.</p>
             <Link to="/collaboration" className="btn btn-primary" style={{ marginTop: 28 }}>Collaborate With Us →</Link>
           </Reveal>
-          <Reveal delay={0.1}><img src="https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=900&q=70&auto=format&fit=crop" alt="Events" style={{ height: 440, objectFit: 'cover', width: '100%' }} /></Reveal>
+          <Reveal delay={0.1}><img src="https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=900&q=70&auto=format&fit=crop" alt="Events" style={{ height: 'clamp(260px, 70vw, 440px)', objectFit: 'cover', width: '100%' }} /></Reveal>
         </div>
       </section>
 

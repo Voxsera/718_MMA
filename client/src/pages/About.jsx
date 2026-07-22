@@ -17,7 +17,7 @@ export default function About() {
       sub="Hyderabad's home for MMA, Muay Thai, Boxing, BJJ and more — built for fighters, open to everyone.">
       <section style={{ paddingTop: 40 }}>
         <div className="container split">
-          <Reveal><img src="https://images.unsplash.com/photo-1605296867304-46d5465a13f1?w=900&q=70&auto=format&fit=crop" alt="718 MMA" style={{ height: 440, objectFit: 'cover', width: '100%', borderRadius: 6 }} /></Reveal>
+          <Reveal><img src="https://images.unsplash.com/photo-1605296867304-46d5465a13f1?w=900&q=70&auto=format&fit=crop" alt="718 MMA" style={{ height: 'clamp(260px, 70vw, 440px)', objectFit: 'cover', width: '100%', borderRadius: 6 }} /></Reveal>
           <Reveal delay={0.1}>
             <div className="section-label">Our Story</div>
             <h2 className="section-title">Built On <span className="text-red">Grit</span></h2>
@@ -38,11 +38,11 @@ export default function About() {
           <div className="split" style={{ alignItems: 'center' }}>
             <Reveal>
               <img src="/saif_thai_boxer.png" alt="Coach Saif — Muay Thai trainer at 718 MMA"
-                style={{ width: '100%', height: 520, objectFit: 'cover', objectPosition: 'top center', borderRadius: 6, border: '1px solid var(--line)' }} />
+                style={{ width: '100%', height: 'clamp(360px, 110vw, 520px)', objectFit: 'cover', objectPosition: 'top center', borderRadius: 6, border: '1px solid var(--line)' }} />
             </Reveal>
             <Reveal delay={0.1}>
               <div className="section-label">Muay Thai · Head Striking Coach</div>
-              <h3 style={{ fontFamily: 'var(--display)', fontSize: 40, lineHeight: .95, textTransform: 'uppercase' }}>
+              <h3 style={{ fontFamily: 'var(--display)', fontSize: 'clamp(28px, 7vw, 40px)', lineHeight: .95, textTransform: 'uppercase' }}>
                 Saif <span className="text-red">“Thai Boxer”</span>
               </h3>
               <p className="section-intro" style={{ marginTop: 16 }}>
@@ -76,7 +76,7 @@ export default function About() {
           <Reveal className="section-head"><div className="section-label">Timings</div>
             <h2 className="section-title">4 Sessions <span className="text-red">Everyday</span></h2>
             <p className="section-intro">Open 6 AM – 12 AM. Four coached sessions daily, plus open facility access for members.</p></Reveal>
-          <Reveal className="timings" style={{ gridTemplateColumns: 'repeat(4,1fr)' }}>
+          <Reveal className="timings timings-4">
             <div className="timing"><span>Morning 1</span><b>6:30 – 8:00 AM</b></div>
             <div className="timing"><span>Morning 2</span><b>8:00 – 9:30 AM</b></div>
             <div className="timing"><span>Evening 1</span><b>6:30 – 8:00 PM</b></div>
@@ -99,7 +99,7 @@ export default function About() {
             </div>
           </Reveal>
           <Reveal delay={0.1}>
-            <iframe title="718 MMA location" width="100%" height="380" style={{ border: '1px solid var(--line)', borderRadius: 6 }}
+            <iframe title="718 MMA location" width="100%" height="300" style={{ minHeight: 'clamp(260px, 80vw, 380px)', border: '1px solid var(--line)', borderRadius: 6 }}
               loading="lazy" referrerPolicy="no-referrer-when-downgrade"
               src="https://www.google.com/maps?q=Seven+One+Eight+Active+MMA+Shivarampally+Jagir+Telangana+500052&output=embed" />
           </Reveal>

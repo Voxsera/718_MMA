@@ -64,7 +64,7 @@ export default function Memberships() {
               <div className="timing"><span>Login</span><b>Members Only</b></div>
             </div>
           </Reveal>
-          <Reveal delay={0.1}><img src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=900&q=70&auto=format&fit=crop" alt="Members" style={{ height: 420, objectFit: 'cover', width: '100%', borderRadius: 6 }} /></Reveal>
+          <Reveal delay={0.1}><img src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=900&q=70&auto=format&fit=crop" alt="Members" style={{ height: 'clamp(240px, 65vw, 420px)', objectFit: 'cover', width: '100%', borderRadius: 6 }} /></Reveal>
         </div>
       </section>
 

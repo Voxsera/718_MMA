@@ -5,19 +5,8 @@ import Page from '../components/Page.jsx';
 import Reveal from '../components/Reveal.jsx';
 import { api } from '../api';
 
-const ug = (id) => `https://images.unsplash.com/${id}?w=1100&q=75&auto=format&fit=crop`;
-
-// A few extra training shots per discipline so each page has a small gallery.
-const GALLERY = {
-  mma: ['photo-1599058917212-d750089bc07e', 'photo-1517438476312-10d79c077509'],
-  'muay-thai': ['photo-1605296867304-46d5465a13f1', 'photo-1517649763962-0c623066013b'],
-  kickboxing: ['photo-1549719386-74dfcbf7dbed', 'photo-1599058917212-d750089bc07e'],
-  boxing: ['photo-1594381898411-846e7d193883', 'photo-1517438476312-10d79c077509'],
-  jujutsu: ['photo-1574680178050-55c6a6a96e0a', 'photo-1517649763962-0c623066013b'],
-  bjj: ['photo-1555597673-b21d5c935865', 'photo-1549476464-37392f717541'],
-  wrestling: ['photo-1605296867304-46d5465a13f1', 'photo-1567013127542-490d757e51fc'],
-  crossfit: ['photo-1534438327276-14e5300c3a48', 'photo-1517838277536-f5f99be501cd'],
-};
+// Gallery images per discipline — each course shows only its own relevant image.
+const GALLERY = {};
 
 // Generic-but-true training highlights per discipline.
 const HIGHLIGHTS = {
@@ -33,8 +22,9 @@ const HIGHLIGHTS = {
 
 const COMMON = ['Coached by experienced professionals', '4 sessions every day · 6 AM to 12 AM', 'Included with any 718 membership'];
 
-function TrialButton({ children = 'Book Free Trial →' }) {
-  return <Link to="/trial" className="btn btn-primary">{children}</Link>;
+function TrialButton({ discipline, children = 'Book Free Trial →' }) {
+  const to = discipline ? `/trial?discipline=${encodeURIComponent(discipline)}` : '/trial';
+  return <Link to={to} className="btn btn-primary">{children}</Link>;
 }
 
 export default function CourseDetail() {
@@ -65,7 +55,7 @@ export default function CourseDetail() {
 
   if (!course) return <Page><div style={{ height: '60vh' }} /></Page>;
 
-  const gallery = (GALLERY[course.slug] || []).map(ug);
+  const gallery = GALLERY[course.slug] || [];
   const points = [...(HIGHLIGHTS[course.slug] || []), ...COMMON];
 
   return (
@@ -79,7 +69,7 @@ export default function CourseDetail() {
             <Link to="/courses" className="cd-back">← All Courses</Link>
             <div className="section-label" style={{ marginTop: 18 }}>{course.tagline}</div>
             <h1 className="cd-title">{course.name}</h1>
-            <div className="cd-hero-cta"><TrialButton /></div>
+            <div className="cd-hero-cta"><TrialButton discipline={course.name} /></div>
           </motion.div>
         </div>
       </header>
@@ -108,6 +98,18 @@ export default function CourseDetail() {
           <div className="cd-gallery">
             <img src={course.image} alt={course.name} className="cd-g-main" loading="lazy" />
             {gallery.map((g, i) => <img key={i} src={g} alt={`${course.name} training`} loading="lazy" />)}
+
+            {/* Course-specific free trial card */}
+            <Reveal delay={0.1} className="cd-trial-card">
+              <div className="section-label">Free Trial</div>
+              <h3 className="cd-trial-title">Try {course.name} <span className="text-red">Free</span></h3>
+              <p className="cd-trial-sub">One full day of {course.name} training on us — meet the coaches, feel the intensity, no commitment.</p>
+              <div className="cd-trial-times">
+                <div className="timing"><span>Morning</span><b>6:30 – 8:00 · 8:00 – 9:30</b></div>
+                <div className="timing"><span>Evening</span><b>6:30 – 8:00 · 8:00 – 9:30</b></div>
+              </div>
+              <TrialButton discipline={course.name}>Book {course.name} Trial →</TrialButton>
+            </Reveal>
           </div>
         </div>
       </section>
@@ -117,7 +119,7 @@ export default function CourseDetail() {
         <div className="container"><Reveal>
           <h2>Your First Day Is <span className="text-red">Free</span></h2>
           <p>Come try {course.name} free — one full day of trial training, no commitment.</p>
-          <TrialButton />
+          <TrialButton discipline={course.name} />
         </Reveal></div>
       </div>
 
@@ -135,15 +137,18 @@ export default function CourseDetail() {
         .cd-points{list-style:none;display:flex;flex-direction:column;gap:14px;margin-top:8px}
         .cd-points li{position:relative;padding-left:30px;color:var(--grey-light);font-size:16px;line-height:1.5}
         .cd-points li::before{content:'';position:absolute;left:0;top:9px;width:12px;height:12px;background:var(--red);transform:rotate(45deg)}
-        .cd-gallery{display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px}
-        .cd-gallery img{width:100%;height:300px;object-fit:cover;display:block}
-        .cd-g-main{grid-row:span 1}
+        .cd-gallery{display:grid;grid-template-columns:1.5fr 1fr;gap:22px;align-items:stretch}
+        .cd-gallery img{width:100%;height:100%;min-height:340px;object-fit:cover;display:block}
+        .cd-trial-card{background:var(--ink-2);border:1px solid var(--line);border-top:3px solid var(--red);padding:34px 30px;display:flex;flex-direction:column;align-items:flex-start;gap:0}
+        .cd-trial-title{font-size:clamp(26px,3.4vw,36px);margin-bottom:12px}
+        .cd-trial-sub{color:var(--grey-light);font-size:15px;line-height:1.65;margin-bottom:20px}
+        .cd-trial-times{display:grid;grid-template-columns:1fr;gap:10px;width:100%;margin-bottom:24px}
+        .cd-trial-card .timing b{font-size:19px}
         @media(max-width:820px){
           .cd-body{grid-template-columns:1fr;gap:30px}
-          .cd-gallery{grid-template-columns:1fr 1fr}
-          .cd-g-main{grid-column:span 2;height:340px}
+          .cd-gallery{grid-template-columns:1fr}
+          .cd-gallery img{min-height:280px;height:300px}
         }
-        @media(max-width:520px){.cd-gallery{grid-template-columns:1fr}.cd-g-main{grid-column:span 1}.cd-gallery img{height:240px}}
       `}</style>
     </Page>
   );

@@ -3,7 +3,8 @@ import { AnimatePresence } from 'framer-motion';
 import Navbar from './components/Navbar.jsx';
 import Footer from './components/Footer.jsx';
 import ScrollToTop from './components/ScrollToTop.jsx';
-import Preloader from './components/Preloader.jsx';
+// import Preloader from './components/Preloader.jsx'; // old loading-bar intro — swap back anytime
+import SplashScreen from './components/splash/SplashScreen.jsx';
 import TargetCursor from './components/TargetCursor.jsx';
 import Home from './pages/Home.jsx';
 import Courses from './pages/Courses.jsx';
@@ -25,7 +26,7 @@ export default function App() {
   const location = useLocation();
   return (
     <>
-      <Preloader />
+      <SplashScreen />
       <TargetCursor
         targetSelector=".card, .course-card, .review-card, .price-card, .timing, .coach-badge, .tcard"
         spinDuration={2}

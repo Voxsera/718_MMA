@@ -75,6 +75,7 @@ section{padding:120px 0}
 
 /* ---------- Timings ---------- */
 .timings{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:28px}
+.timings-4{grid-template-columns:repeat(4,1fr)}
 .timing{background:var(--ink-2);border-left:3px solid var(--red);padding:18px 20px}
 .timing b{font-family:var(--cond);font-size:23px;letter-spacing:1px}
 .timing span{display:block;color:var(--grey);font-size:12px;text-transform:uppercase;letter-spacing:2px}
@@ -192,12 +193,31 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--red)}
   .split{grid-template-columns:1fr;gap:40px}
   section{padding:84px 0}
   .section-head{margin-bottom:44px}
+  .timings-4{grid-template-columns:1fr 1fr}
 }
 @media(max-width:600px){
+  .container{padding:0 18px}
   .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
   .form .row{grid-template-columns:1fr}
+  .form{padding:26px 20px}
   .course-card,.grid-3 .course-card{height:340px}
   .page-head::after,.hero::after{display:none}
+  section{padding:64px 0}
+  .section-head{margin-bottom:36px}
+  .section-intro{font-size:15.5px}
+  .split{gap:32px}
+  .btn{padding:15px 28px;font-size:14px}
+  .page-head{padding:130px 0 54px}
+  .cta-banner{padding:60px 0}
+  .price-card{padding:30px 22px}
+  .price-card .price{font-size:46px}
+  .card .body{padding:22px 18px}
+  .review-card{padding:24px 20px}
+  .timing{padding:15px 16px}
+  .timing b{font-size:20px}
+}
+@media(max-width:420px){
+  .timings,.timings-4{grid-template-columns:1fr}
 }
 
 /* Scroll cue — mobile only (hidden on desktop to avoid overlap) */

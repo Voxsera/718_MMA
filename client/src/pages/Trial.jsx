@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import PageHead from '../components/PageHead.jsx';
 import Reveal from '../components/Reveal.jsx';
 import { api } from '../api';
@@ -6,7 +7,10 @@ import { api } from '../api';
 const DISCIPLINES = ['MMA', 'Muay Thai', 'Kickboxing', 'Boxing', 'Jujutsu', 'BJJ', 'Wrestling', 'CrossFit', 'Not sure yet'];
 
 export default function Trial() {
-  const [form, setForm] = useState({ name: '', phone: '', email: '', discipline: 'MMA', preferred_date: '', message: '' });
+  // If the user came from a course page (/trial?discipline=Muay Thai), pre-select it.
+  const [params] = useSearchParams();
+  const fromCourse = DISCIPLINES.find((d) => d.toLowerCase() === (params.get('discipline') || '').trim().toLowerCase());
+  const [form, setForm] = useState({ name: '', phone: '', email: '', discipline: fromCourse || 'MMA', preferred_date: '', message: '' });
   const [msg, setMsg] = useState(null);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const submit = async (e) => {
@@ -22,7 +26,7 @@ export default function Trial() {
       <section style={{ paddingTop: 40 }}>
         <div className="container split">
           <Reveal>
-            <img src="https://images.unsplash.com/photo-1517438476312-10d79c077509?w=900&q=70&auto=format&fit=crop" alt="Trial" style={{ height: 280, objectFit: 'cover', width: '100%', borderRadius: 6, marginBottom: 22 }} />
+            <img src="https://images.unsplash.com/photo-1549476464-37392f717541?w=900&q=70&auto=format&fit=crop" alt="Trial" style={{ height: 280, objectFit: 'cover', width: '100%', borderRadius: 6, marginBottom: 22 }} />
             <h2 className="section-title" style={{ fontSize: 34 }}>How It <span className="text-red">Works</span></h2>
             <div className="timings" style={{ gridTemplateColumns: '1fr' }}>
               <div className="timing"><b>1 · Book your slot</b><span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--grey-light)' }}>Fill the form — pick a discipline and a day.</span></div>
@@ -32,7 +36,9 @@ export default function Trial() {
           </Reveal>
           <Reveal delay={0.1}>
             <form className="form" onSubmit={submit}>
-              <h2 style={{ fontFamily: 'var(--cond)', letterSpacing: 1, textTransform: 'uppercase' }}>Claim Your Free Trial</h2>
+              <h2 style={{ fontFamily: 'var(--cond)', letterSpacing: 1, textTransform: 'uppercase' }}>
+                Claim Your Free {fromCourse && fromCourse !== 'Not sure yet' ? <span style={{ color: 'var(--red)' }}>{fromCourse} </span> : ''}Trial
+              </h2>
               <div className="row"><div><label>Name *</label><input value={form.name} onChange={set('name')} required /></div>
                 <div><label>Phone *</label><input value={form.phone} onChange={set('phone')} required /></div></div>
               <label>Email</label><input type="email" value={form.email} onChange={set('email')} />

@@ -4,18 +4,18 @@ import PageHead from '../components/PageHead.jsx';
 import Reveal from '../components/Reveal.jsx';
 import { api } from '../api';
 
-const PILL = { upcoming: 'pill-red', ongoing: 'pill-green', past: 'pill-grey' };
-const TABS = ['upcoming', 'ongoing', 'past', 'all'];
+const PILL = { upcoming: 'pill-red', ongoing: 'pill-green' };
+const TABS = ['upcoming', 'ongoing'];
 
 export default function Events() {
   const [events, setEvents] = useState([]);
   const [tab, setTab] = useState('upcoming');
-  useEffect(() => { api.get('/api/events').then(setEvents).catch(() => {}); }, []);
-  const list = tab === 'all' ? events : events.filter((e) => e.status === tab);
+  useEffect(() => { api.get('/api/events').then((e) => setEvents(e.filter((x) => x.status !== 'past'))).catch(() => {}); }, []);
+  const list = events.filter((e) => e.status === tab);
 
   return (
     <PageHead crumb="Events" title='718 <span class="text-red">Events</span>'
-      sub="Seminars, sparring meets, fight nights and community gatherings. Everything past, present and on the horizon.">
+      sub="Seminars, sparring meets, fight nights and community gatherings. See what's on the horizon.">
       <section style={{ paddingTop: 40 }}>
         <div className="container">
           <div className="tabs">
