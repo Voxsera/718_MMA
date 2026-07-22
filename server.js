@@ -310,6 +310,11 @@ const SESSIONS = [
 app.get('/api/config', (req, res) =>
   res.json({ googleClientId: GOOGLE_CLIENT_ID, razorpayKey: RZP_KEY_ID, razorpayLive: RZP_LIVE, sessions: SESSIONS, adminPasswordLogin: ADMIN_PASSWORD_LOGIN, terminalEnabled: worldline.worldlineReady }));
 app.get('/api/sessions', (req, res) => res.json(SESSIONS));
+// Keep-alive: touches the DB so a single ping keeps Render awake AND Supabase from pausing.
+app.get('/api/keepalive', h(async (req, res) => {
+  try { await db.get('SELECT 1 AS ok'); res.json({ ok: true, ts: new Date().toISOString() }); }
+  catch (e) { res.status(500).json({ ok: false }); }
+}));
 
 app.get('/api/courses', h(async (req, res) => res.json(await db.all('SELECT * FROM courses ORDER BY sort'))));
 app.get('/api/memberships', h(async (req, res) => res.json(await db.all('SELECT * FROM memberships ORDER BY sort'))));
