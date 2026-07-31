@@ -104,8 +104,21 @@ async function init() {
   await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS session TEXT`);
   await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS session TEXT`);
   await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS terminal_ref TEXT`);
+  await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS membership_id TEXT`);
+  await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS note TEXT`);
+  await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS bill_amount INTEGER`);
+  await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS due_amount INTEGER DEFAULT 0`);
+  await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS discount INTEGER DEFAULT 0`);
+  await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS discount_note TEXT`);
   await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS membership_id TEXT`);
   await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS method TEXT`);
+  await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS name TEXT`);
+  await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS phone TEXT`);
+  await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS paid_amount INTEGER`);
+  await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS pending_amount INTEGER DEFAULT 0`);
+  await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS cash_amount INTEGER DEFAULT 0`);
+  await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS online_amount INTEGER DEFAULT 0`);
+  await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS pending_cleared_at TIMESTAMPTZ`);
 }
 
 module.exports = { pool, all, get, run, init };

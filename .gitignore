@@ -8,3 +8,9 @@ data.db-shm
 data.db-wal
 data.db-journal
 uploads/
+# Excel temp lock files
+~$*
+# Real member data — never commit customer PII
+test.xlsx
+*_members_*.xlsx
+Adm List.pdf

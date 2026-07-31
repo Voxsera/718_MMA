@@ -2,6 +2,7 @@
 (function () {
   const $ = (s) => document.querySelector(s);
   const inr = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
+  const dstr = (s) => { if (!s) return '-'; const d = new Date(s); if (isNaN(d)) return '-'; return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`; }; // DD-MM-YYYY
   const SESSIONS = ['Session 1 · 6:30–8:00 AM', 'Session 2 · 8:00–9:30 AM', 'Session 3 · 6:30–8:00 PM', 'Session 4 · 8:00–9:30 PM'];
   const sessionOptions = () => SESSIONS.map((s) => [s, s]);
   const api = {
@@ -26,8 +27,8 @@
     const addMemberBtn = document.getElementById('add-member');
     if (addMemberBtn) addMemberBtn.style.display = ROLE === 'coach' ? 'none' : '';
     // Excel import is owner-only.
-    const impBox = document.getElementById('import-box');
-    if (impBox) impBox.style.display = ROLE === 'owner' ? '' : 'none';
+    const impToggle = document.getElementById('import-toggle');
+    if (impToggle) impToggle.style.display = ROLE === 'owner' ? '' : 'none';
     if (cfg) {
       const side = document.querySelector('.side');
       let anchor = side.querySelector('.brand');
@@ -70,10 +71,19 @@
   }
   $('#logout').addEventListener('click', async () => { await api.send('/api/admin/logout', 'POST'); show(false); });
 
-  // Mobile sidebar drawer
+  // Sidebar: mobile = slide-in drawer, desktop = freely collapse/expand (state remembered).
+  const wrapEl = document.querySelector('.admin-wrap');
+  const isMobile = () => window.matchMedia('(max-width:900px)').matches;
   const openMenu = () => { document.querySelector('.side').classList.add('open'); $('#side-overlay').classList.add('open'); };
   const closeMenu = () => { document.querySelector('.side').classList.remove('open'); $('#side-overlay').classList.remove('open'); };
-  document.getElementById('menu-btn').addEventListener('click', openMenu);
+  const setCollapsed = (on) => { wrapEl.classList.toggle('side-collapsed', on); try { localStorage.setItem('sideCollapsed', on ? '1' : '0'); } catch (e) {} };
+  try { if (localStorage.getItem('sideCollapsed') === '1') wrapEl.classList.add('side-collapsed'); } catch (e) {}
+  const toggleSidebar = () => {
+    if (isMobile()) { document.querySelector('.side').classList.contains('open') ? closeMenu() : openMenu(); }
+    else { setCollapsed(!wrapEl.classList.contains('side-collapsed')); }
+  };
+  document.getElementById('menu-btn').addEventListener('click', toggleSidebar);
+  { const st = document.getElementById('side-toggle'); if (st) st.addEventListener('click', toggleSidebar); }
   document.getElementById('side-overlay').addEventListener('click', closeMenu);
 
   document.querySelectorAll('.side a[data-v]').forEach((a) => a.addEventListener('click', () => {
@@ -93,7 +103,7 @@
   };
 
   // Styled modal form. fields: [{key,label,type,placeholder,value,options:[[val,label]]}]
-  function openForm(title, fields) {
+  function openForm(title, fields, onRender) {
     return new Promise((resolve) => {
       const overlay = $('#modal');
       $('#modal-title').textContent = title;
@@ -111,6 +121,7 @@
       }).join('');
       overlay.classList.add('open');
       const body = $('#modal-body');
+      if (onRender) { try { onRender(body); } catch (e) { console.error(e); } }
       const first = body.querySelector('input,select,textarea'); if (first) setTimeout(() => first.focus(), 50);
       const close = (val) => { overlay.classList.remove('open'); $('#modal-save').onclick = null; $('#modal-cancel').onclick = null; overlay.onclick = null; resolve(val); };
       $('#modal-save').onclick = () => {
@@ -151,6 +162,28 @@
       const close = () => { overlay.classList.remove('open'); $('#modal-save').onclick = null; overlay.onclick = null; $('#modal-save').textContent = 'Save'; $('#modal-cancel').style.display = ''; resolve(); };
       $('#modal-save').onclick = () => close();
       overlay.onclick = (e) => { if (e.target === overlay) close(); };
+    });
+  }
+  // Wide dialog for the billing ledger. Resolves 'edit' or 'close'.
+  function detailsModal(title, html) {
+    return new Promise((resolve) => {
+      const overlay = $('#modal');
+      const card = overlay.querySelector('.modal-card');
+      $('#modal-title').textContent = title;
+      $('#modal-body').innerHTML = html;
+      $('#modal-save').textContent = 'Close';
+      $('#modal-cancel').textContent = 'Edit Member';
+      $('#modal-cancel').style.display = (ROLE === 'owner') ? '' : 'none';
+      if (card) { card.style.maxWidth = '880px'; }
+      overlay.classList.add('open');
+      const close = (val) => {
+        overlay.classList.remove('open'); $('#modal-save').onclick = null; $('#modal-cancel').onclick = null; overlay.onclick = null;
+        $('#modal-save').textContent = 'Save'; $('#modal-cancel').textContent = 'Cancel'; $('#modal-cancel').style.display = '';
+        if (card) { card.style.maxWidth = ''; } resolve(val);
+      };
+      $('#modal-save').onclick = () => close('close');
+      $('#modal-cancel').onclick = () => close('edit');
+      overlay.onclick = (e) => { if (e.target === overlay) close('close'); };
     });
   }
   // Non-dismissable "waiting" dialog (no buttons) for the terminal.
@@ -259,10 +292,17 @@
   }
 
   async function loadTrials() {
-    const rows = (await api.get('/api/admin/trials') || []).map((t) => `<tr><td>${t.name}</td><td>${t.phone}<br><span class="hint">${t.email || ''}</span></td><td>${t.discipline || '-'}</td><td>${t.preferred_date || '-'}</td><td>${badge(t.status)}</td><td><select class="mini" onchange="ADMIN.setTrial(${t.id}, this.value)">${['new', 'contacted', 'completed'].map((s) => `<option ${t.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select></td></tr>`);
-    $('#trials-table').innerHTML = rows.length ? tbl(['Name', 'Contact', 'Discipline', 'Date', 'Status', 'Update'], rows) : '<p class="hint">No bookings yet.</p>';
+    const rows = (await api.get('/api/admin/trials') || []).map((t) => `<tr><td>${t.name}</td><td>${t.phone}<br><span class="hint">${t.email || ''}</span></td><td>${t.discipline || '-'}</td><td>${t.preferred_date || '-'}</td><td>${badge(t.status)}</td><td><select class="mini" onchange="ADMIN.setTrial(${t.id}, this.value)">${['new', 'contacted', 'completed'].map((s) => `<option ${t.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>${ROLE === 'owner' ? ` <button class="mini" style="border-color:var(--red);color:var(--red)" onclick="ADMIN.delTrial(${t.id})">Delete</button>` : ''}</td></tr>`);
+    $('#trials-table').innerHTML = rows.length ? tbl(['Name', 'Contact', 'Discipline', 'Date', 'Status', 'Manage'], rows) : '<p class="hint">No bookings yet.</p>';
   }
   async function setTrial(id, status) { await api.send('/api/admin/trials/' + id, 'PATCH', { status }); }
+  async function delTrial(id) {
+    const ok = await confirmModal('Delete trial booking', 'Delete this trial booking? This cannot be undone.', 'Delete');
+    if (!ok) return;
+    const r = await api.send('/api/admin/trials/' + id, 'DELETE');
+    if (!r.ok) await notifyModal('Failed', r.error || 'Could not delete.');
+    loadTrials();
+  }
   $('#add-trial').addEventListener('click', async () => {
     const d = await openForm('Add Trial (walk-in)', [
       { key: 'name', label: 'Name' },
@@ -276,10 +316,17 @@
   });
 
   async function loadCollabs() {
-    const rows = (await api.get('/api/admin/collaborations') || []).map((c) => `<tr><td>${c.name}<br><span class="hint">${c.organization || ''}</span></td><td>${c.email}<br><span class="hint">${c.phone || ''}</span></td><td>${c.type || '-'}</td><td style="max-width:260px">${c.message || ''}</td><td>${badge(c.status)}</td><td><select class="mini" onchange="ADMIN.setCollab(${c.id}, this.value)">${['new', 'reviewing', 'accepted', 'declined'].map((s) => `<option ${c.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select></td></tr>`);
-    $('#collabs-table').innerHTML = rows.length ? tbl(['Name', 'Contact', 'Type', 'Message', 'Status', 'Update'], rows) : '<p class="hint">No requests yet.</p>';
+    const rows = (await api.get('/api/admin/collaborations') || []).map((c) => `<tr><td>${c.name}<br><span class="hint">${c.organization || ''}</span></td><td>${c.email}<br><span class="hint">${c.phone || ''}</span></td><td>${c.type || '-'}</td><td style="max-width:260px">${c.message || ''}</td><td>${badge(c.status)}</td><td><select class="mini" onchange="ADMIN.setCollab(${c.id}, this.value)">${['new', 'reviewing', 'accepted', 'declined'].map((s) => `<option ${c.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>${ROLE === 'owner' ? ` <button class="mini" style="border-color:var(--red);color:var(--red)" onclick="ADMIN.delCollab(${c.id})">Delete</button>` : ''}</td></tr>`);
+    $('#collabs-table').innerHTML = rows.length ? tbl(['Name', 'Contact', 'Type', 'Message', 'Status', 'Manage'], rows) : '<p class="hint">No requests yet.</p>';
   }
   async function setCollab(id, status) { await api.send('/api/admin/collaborations/' + id, 'PATCH', { status }); }
+  async function delCollab(id) {
+    const ok = await confirmModal('Delete collaboration', 'Delete this collaboration request? This cannot be undone.', 'Delete');
+    if (!ok) return;
+    const r = await api.send('/api/admin/collaborations/' + id, 'DELETE');
+    if (!r.ok) await notifyModal('Failed', r.error || 'Could not delete.');
+    loadCollabs();
+  }
   $('#add-collab').addEventListener('click', async () => {
     const d = await openForm('Add Collaborator', [
       { key: 'name', label: 'Contact name' },
@@ -310,64 +357,316 @@
   async function getPlans() { return (await api.get('/api/admin/memberships')) || []; }
   function planSelectOptions(plans) { return plans.map((p) => [p.name, `${p.name} — ${inr(p.price)}`]); }
 
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  // Turn a date-only value into a real timestamp: today -> the actual current time; a past date -> local noon (avoids timezone date-shift).
+  const stampFor = (dateStr) => {
+    if (!dateStr || dateStr === today()) return new Date().toISOString();
+    const d = new Date(dateStr + 'T12:00:00');
+    return isNaN(d) ? new Date().toISOString() : d.toISOString();
+  };
   let _members = [];
   async function loadMembers() {
     _members = (await api.get('/api/admin/members') || []);
-    const rows = _members.map((m) => {
+    renderMembers();
+  }
+  const memberIdNum = (id) => { const n = parseInt(String(id || '').replace(/[^\d]/g, ''), 10); return isNaN(n) ? 0 : n; };
+  function renderMembers() {
+    const box = document.getElementById('member-search');
+    const q = (box ? box.value : '').trim().toLowerCase();
+    let list = q
+      ? _members.filter((m) => [m.name, m.membership_id, m.email, m.phone, m.plan].some((f) => String(f || '').toLowerCase().includes(q)))
+      : _members.slice();
+    const sortBy = (document.getElementById('member-sort') || {}).value || 'recent';
+    if (sortBy === 'id-asc') list.sort((a, b) => memberIdNum(a.membership_id) - memberIdNum(b.membership_id));
+    else if (sortBy === 'id-desc') list.sort((a, b) => memberIdNum(b.membership_id) - memberIdNum(a.membership_id));
+    else if (sortBy === 'expiry-asc') list.sort((a, b) => new Date(a.expires_at || 0) - new Date(b.expires_at || 0));
+    else if (sortBy === 'name-asc') list.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    const rows = list.map((m) => {
       const active = new Date(m.expires_at) > new Date();
-      const manage = ROLE === 'coach' ? '—'
-        : `<button class="mini" onclick="ADMIN.renewMember(${m.id})">Renew</button>`
-          + (ROLE === 'owner' ? ` <button class="mini" onclick="ADMIN.delMember(${m.id}, '${(m.email || '').replace(/'/g, '')}')">Delete</button>` : '');
-      const mode = m.method === 'cash' ? 'Cash' : (m.method ? (m.method.charAt(0).toUpperCase() + m.method.slice(1)) : '-');
-      return `<tr><td><b style="color:#fff">${m.membership_id || '-'}</b></td><td>${m.email}</td><td>${m.plan || '-'}</td><td>${m.session || '-'}</td><td>${inr(m.amount)}</td><td>${mode}</td><td>${(m.expires_at || '').slice(0, 10)}</td><td>${badge(active ? 'paid' : 'past')}</td>
+      const combo = m.name ? `${m.name}(${m.membership_id || ''})` : (m.membership_id || '-');
+      const pend = m.pending_amount || 0;
+      const paidAmt = m.paid_amount != null ? m.paid_amount : m.amount;
+      let manage = '—';
+      if (ROLE !== 'coach') {
+        manage = '';
+        manage += `<button class="mini" onclick="ADMIN.showDetails(${m.id})">Details</button> `;
+        if (pend > 0) manage += `<button class="mini" style="border-color:var(--red);color:var(--red)" onclick="ADMIN.clearPending(${m.id})">Pending ${inr(pend)}</button> `;
+        manage += `<button class="mini" onclick="ADMIN.renewMember(${m.id})">Renew</button>`;
+        if (ROLE === 'owner') manage += ` <button class="mini" onclick="ADMIN.editMember(${m.id})">Edit</button>`;
+        if (ROLE === 'owner') manage += ` <button class="mini" onclick="ADMIN.delMember(${m.id}, '${(m.email || '').replace(/'/g, '')}')">Delete</button>`;
+      }
+      return `<tr>
+        <td><b style="color:#fff">${m.membership_id || '-'}</b></td>
+        <td>${m.name || '-'}</td>
+        <td>${combo}</td>
+        <td>${m.email || '-'}</td>
+        <td>${m.phone || '-'}</td>
+        <td>${m.plan || '-'}</td>
+        <td>${inr(m.amount)}</td>
+        <td>${inr(paidAmt)}</td>
+        <td>${pend > 0 ? `<span style="color:var(--red)">${inr(pend)}</span>` : '-'}</td>
+        <td>${m.method || '-'}</td>
+        <td>${dstr(m.starts_at)}</td>
+        <td>${dstr(m.expires_at)}</td>
+        <td>${active ? '<span class="status-pill active">Active</span>' : '<span class="status-pill expired">Expired</span>'}</td>
         <td>${manage}</td></tr>`;
     });
-    $('#members-table').innerHTML = rows.length ? tbl(['Member ID', 'Email', 'Plan', 'Session', 'Paid', 'Mode', 'Expires', 'Status', 'Manage'], rows) : '<p class="hint">No members yet. Memberships appear here after a successful payment.</p>';
+    const countEl = document.getElementById('member-count');
+    if (countEl) countEl.textContent = q ? `${list.length} of ${_members.length}` : `${_members.length} member${_members.length === 1 ? '' : 's'}`;
+    $('#members-table').innerHTML = rows.length
+      ? tbl(['Membership No', 'Name', 'Member (Name/ID)', 'Email', 'Mobile', 'Package', 'Amount', 'Paid', 'Pending', 'Mode of Payment', 'Date', 'Expires', 'Status', 'Manage'], rows)
+      : (q ? `<p class="hint">No members match “${q}”.</p>` : '<p class="hint">No members yet.</p>');
   }
+  { const it = document.getElementById('import-toggle'); if (it) it.addEventListener('click', openImportModal); }
+  { const ss = document.getElementById('member-sort'); if (ss) ss.addEventListener('change', renderMembers); }
+  { const sb = document.getElementById('member-search'); const cl = document.getElementById('member-search-clear'); const wrap = sb ? sb.closest('.search-wrap') : null;
+    if (sb) sb.addEventListener('input', () => { if (wrap) wrap.classList.toggle('has-text', !!sb.value); renderMembers(); });
+    if (sb) sb.addEventListener('keydown', (e) => { if (e.key === 'Escape') { sb.value = ''; if (wrap) wrap.classList.remove('has-text'); renderMembers(); } });
+    if (cl) cl.addEventListener('click', () => { sb.value = ''; if (wrap) wrap.classList.remove('has-text'); renderMembers(); sb.focus(); }); }
   $('#add-member').addEventListener('click', async () => {
     const plans = await getPlans();
-    const d = await openForm('Add Member (offline)', [
+    const priceOf = (name) => { const p = plans.find((x) => x.name === name); return p ? p.price : 0; };
+    const d = await openForm('Add Member', [
       { key: 'name', label: 'Member name' },
-      { key: 'email', label: 'Email (used for login + invoice)' },
-      { key: 'phone', label: 'Phone (optional)' },
-      { key: 'plan', label: 'Plan (charge this amount on the machine / cash)', type: 'select', value: (plans[0] && plans[0].name) || 'Monthly', options: planSelectOptions(plans) },
-      { key: 'session', label: 'Session (which of the 4 daily slots)', type: 'select', value: SESSIONS[0], options: sessionOptions() },
-      { key: 'amount', label: 'Amount paid (₹) — blank = plan price', type: 'number' },
-      { key: 'method', label: 'Payment method', type: 'select', value: 'cash', options: [['cash', 'Cash'], ['online', TERMINAL ? 'Online — charge on machine' : 'Online (card / UPI on machine)']] },
-      { key: 'durationDays', label: 'Duration in days (blank = auto from plan)', type: 'number' },
-    ]);
+      { key: 'membershipId', label: 'Membership No (blank = auto, e.g. 718MMA…)' },
+      { key: 'email', label: 'Email (optional — needed for reminders/invoice)' },
+      { key: 'phone', label: 'Mobile (optional)' },
+      { key: 'plan', label: 'Package', type: 'select', value: (plans[0] && plans[0].name) || 'Monthly', options: planSelectOptions(plans) },
+      { key: 'session', label: 'Session (optional)', type: 'select', value: SESSIONS[0], options: sessionOptions() },
+      { key: 'discountType', label: 'Discount (optional)', type: 'select', value: 'none', options: [['none', 'No discount'], ['percent', 'Percentage off (%)'], ['amount', 'Flat amount off (₹)']] },
+      { key: 'discountValue', label: 'Discount value (e.g. 10 = 10% or ₹10, per above)', type: 'number' },
+      { key: 'amount', label: 'Total payable (₹) — auto-filled from package & discount; edit only to override', type: 'number', value: (plans[0] && plans[0].price) || '' },
+      { key: 'cashAmount', label: 'Paid in cash now (₹) — blank = full amount in cash', type: 'number' },
+      { key: 'onlineAmount', label: 'Paid online / POS now (₹)', type: 'number' },
+      { key: 'date', label: 'Date paid (membership starts this day)', type: 'date', value: today() },
+    ], (body) => {
+      const q = (k) => body.querySelector(`[data-k="${k}"]`);
+      const planSel = q('plan'), dType = q('discountType'), dVal = q('discountValue'), amt = q('amount');
+      let overridden = false;
+      amt.addEventListener('input', () => { overridden = true; });
+      const recompute = () => {
+        if (overridden) return;
+        const price = priceOf(planSel.value);
+        const v = parseInt(dVal.value, 10) || 0;
+        let disc = 0;
+        if (v > 0 && dType.value === 'percent') disc = Math.round(price * v / 100);
+        else if (v > 0 && dType.value === 'amount') disc = v;
+        amt.value = Math.max(0, price - disc);
+      };
+      [planSel, dType, dVal].forEach((el) => { el.addEventListener('input', recompute); el.addEventListener('change', recompute); });
+      recompute();
+    });
     if (!d) return;
-    if (!d.email) return notifyModal('Email required', 'Please enter the member\'s email — it\'s used for their app login and invoice.');
-    if (!d.amount && plans.find((p) => p.name === d.plan)) d.amount = plans.find((p) => p.name === d.plan).price;
-    // Online + terminal configured -> push to the machine (webhook completes the membership).
-    if (d.method === 'online' && TERMINAL) {
-      await chargeOnMachine({ name: d.name, email: d.email, phone: d.phone, plan: d.plan, amount: d.amount, session: d.session });
-      loadMembers(); return;
+    const planObj = plans.find((p) => p.name === d.plan);
+    const listPrice = planObj ? planObj.price : 0;
+    // --- discount ---
+    const dv = parseInt(d.discountValue, 10) || 0;
+    let discount = 0, discountNote = '';
+    if (dv > 0 && d.discountType === 'percent') { discount = Math.round(listPrice * dv / 100); discountNote = `${dv}% off (−${inr(discount)})`; }
+    else if (dv > 0 && d.discountType === 'amount') { discount = dv; discountNote = `${inr(dv)} off`; }
+    // --- total ---
+    let total = parseInt(d.amount, 10) || 0;
+    if (!total) total = Math.max(0, listPrice - discount);
+    d.amount = total; d.discount = discount; d.discountNote = discountNote;
+    d.date = stampFor(d.date);
+    // --- payment split: if nothing entered, assume paid in full (cash) — never silently "all pending" ---
+    let cash = parseInt(d.cashAmount, 10) || 0;
+    let online = parseInt(d.onlineAmount, 10) || 0;
+    if (!cash && !online) { cash = total; d.cashAmount = String(total); }
+    const paid = cash + online;
+    const pending = Math.max(0, total - paid);
+    if (pending > 0) {
+      const tiny = pending <= 20;
+      const ok = await confirmModal('Confirm pending balance',
+        `Total is <b style="color:#fff">${inr(total)}</b> and <b style="color:#fff">${inr(paid)}</b> was paid now, leaving <b style="color:#e8112d">${inr(pending)}</b> to collect later.` +
+        (tiny ? `<br><br>That's only <b style="color:#e8112d">${inr(pending)}</b> — did you mistype the amount? If it's a typo, press Cancel and fix it.` : '<br><br>Record this as a pending balance?'),
+        `Yes — ${inr(pending)} due later`);
+      if (!ok) return;
     }
     const r = await api.send('/api/admin/members', 'POST', d);
-    if (r.ok) await notifyModal('Member added', `Invoice <b style="color:#fff">${r.invoiceNo}</b> ${r.emailed ? 'emailed to ' + d.email : '(email not configured — set SMTP in .env)'}.`);
-    else await notifyModal('Failed', r.error || 'Could not add the member.');
+    if (r.ok) {
+      const pendMsg = r.pending > 0 ? `<br><b style="color:#e8112d">${inr(r.pending)} still due</b> — use the Pending button when they pay.` : '';
+      const discMsg = discountNote ? `<br>Discount applied: <b style="color:#fff">${discountNote}</b>.` : '';
+      await notifyModal('Member added', `Membership No <b style="color:#fff">${r.memberId}</b>.${r.invoiceNo ? ` Invoice ${r.invoiceNo}${r.emailed ? ' emailed' : ''}.` : ''}${discMsg}${pendMsg}`);
+    } else await notifyModal('Failed', r.error || 'Could not add the member.');
     loadMembers();
   });
-  async function renewMember(id) {
-    const plans = await getPlans();
-    const d = await openForm('Renew Membership', [
-      { key: 'plan', label: 'Plan (charge this amount on the machine / cash)', type: 'select', value: (plans[0] && plans[0].name) || 'Monthly', options: planSelectOptions(plans) },
-      { key: 'session', label: 'Session (which of the 4 daily slots)', type: 'select', value: SESSIONS[0], options: sessionOptions() },
-      { key: 'amount', label: 'Amount paid (₹) — blank = plan price', type: 'number' },
-      { key: 'method', label: 'Payment method', type: 'select', value: 'cash', options: [['cash', 'Cash'], ['online', TERMINAL ? 'Online — charge on machine' : 'Online (card / UPI on machine)']] },
-      { key: 'durationDays', label: 'Duration in days (blank = auto from plan)', type: 'number' },
+  async function clearPending(id) {
+    const m = _members.find((x) => x.id === id);
+    const due = m ? (m.pending_amount || 0) : 0;
+    const d = await openForm('Clear Pending Balance', [
+      { key: 'date', label: `Date received (balance due: ${inr(due)})`, type: 'date', value: today() },
+      { key: 'cashAmount', label: 'Received in cash (₹)', type: 'number' },
+      { key: 'onlineAmount', label: 'Received online / POS (₹)', type: 'number' },
     ]);
     if (!d) return;
-    if (!d.amount && plans.find((p) => p.name === d.plan)) d.amount = plans.find((p) => p.name === d.plan).price;
-    if (d.method === 'online' && TERMINAL) {
-      const m = _members.find((x) => x.id === id);
-      await chargeOnMachine({ name: '', email: m ? m.email : '', phone: '', plan: d.plan, amount: d.amount, session: d.session });
+    d.date = stampFor(d.date);
+    const r = await api.send('/api/admin/members/' + id + '/clear-pending', 'POST', d);
+    if (r.ok) await notifyModal('Balance updated', r.pending > 0 ? `Recorded. Remaining due: <b style="color:#e8112d">${inr(r.pending)}</b>.` : 'Fully paid — no balance remaining. ✓');
+    else await notifyModal('Failed', r.error || 'Could not update the balance.');
+    loadMembers();
+  }
+  // Proper billing ledger: member profile + account summary + per-transaction Bill/Paid/Due table.
+  async function showDetails(id) {
+    const data = await api.get('/api/admin/members/' + id + '/details');
+    if (!data || !data.member) { await notifyModal('Not found', 'Could not load this member.'); return; }
+    const m = data.member;
+    const active = new Date(m.expires_at) > new Date();
+    const dt = (s) => { if (!s) return '-'; const d = new Date(s); return d.toLocaleDateString('en-IN') + ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }); };
+    const typeOf = (note) => {
+      const n = (note || '').toLowerCase();
+      if (n.startsWith('renewal')) return 'Renewal';
+      if (n.startsWith('balance')) return 'Balance payment';
+      if (n.startsWith('imported')) return 'Imported';
+      return 'New membership';
+    };
+    const pays = data.payments || [];
+    let billed = 0, collected = 0;
+    const rowsHtml = pays.map((p) => {
+      const bill = p.bill_amount != null ? p.bill_amount : 0;
+      const paid = p.amount || 0;
+      const due = p.due_amount || 0;
+      billed += bill; collected += paid;
+      const disc = (p.note || '').includes('·') ? p.note.split('·').slice(1).join('·').trim() : '';
+      return `<tr>
+        <td style="padding:8px 10px;border-top:1px solid #2a2a2a;white-space:nowrap">${dt(p.created_at)}</td>
+        <td style="padding:8px 10px;border-top:1px solid #2a2a2a">${typeOf(p.note)}${disc ? `<br><span class="hint">${disc}</span>` : ''}</td>
+        <td style="padding:8px 10px;border-top:1px solid #2a2a2a;text-align:right">${bill ? inr(bill) : '—'}</td>
+        <td style="padding:8px 10px;border-top:1px solid #2a2a2a;text-align:right;color:#3ecf8e">${inr(paid)}</td>
+        <td style="padding:8px 10px;border-top:1px solid #2a2a2a;text-align:right">${due > 0 ? `<span style="color:#e8112d">${inr(due)}</span>` : '—'}</td>
+        <td style="padding:8px 10px;border-top:1px solid #2a2a2a">${p.method || '-'}</td></tr>`;
+    }).join('');
+    const balance = m.pending_amount || 0;
+    const history = rowsHtml
+      ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:640px">
+           <thead><tr style="color:var(--red);font-family:var(--cond);letter-spacing:1px;text-align:left">
+             <th style="padding:8px 10px">Date &amp; time</th><th style="padding:8px 10px">Type</th>
+             <th style="padding:8px 10px;text-align:right">Bill</th><th style="padding:8px 10px;text-align:right">Paid</th>
+             <th style="padding:8px 10px;text-align:right">Due</th><th style="padding:8px 10px">Method</th></tr></thead>
+           <tbody>${rowsHtml}</tbody>
+           <tfoot><tr style="border-top:2px solid var(--red);font-weight:700">
+             <td style="padding:8px 10px" colspan="2">Totals</td>
+             <td style="padding:8px 10px;text-align:right;color:#fff">${inr(billed)}</td>
+             <td style="padding:8px 10px;text-align:right;color:#3ecf8e">${inr(collected)}</td>
+             <td style="padding:8px 10px;text-align:right">${balance > 0 ? `<span style="color:#e8112d">${inr(balance)}</span>` : '—'}</td>
+             <td style="padding:8px 10px"></td></tr></tfoot>
+         </table></div>`
+      : '<p class="hint" style="margin-top:6px">No transactions recorded yet.</p>';
+    const card = (label, value, color) => `<div style="flex:1;min-width:120px;background:var(--ink);border:1px solid var(--line);border-radius:8px;padding:12px 14px">
+        <div style="font-size:20px;font-weight:800;color:${color || '#fff'}">${value}</div>
+        <div class="hint" style="margin-top:2px">${label}</div></div>`;
+    const info = `
+      <div style="font-size:14px;line-height:1.8;margin-bottom:14px">
+        <b style="color:#fff;font-size:16px">${m.name || '-'}</b> &nbsp;·&nbsp; Membership No <b style="color:#fff">${m.membership_id || '-'}</b>
+        &nbsp;·&nbsp; ${active ? '<span style="color:#3ecf8e">● Active</span>' : '<span style="color:var(--red)">● Expired</span>'}<br>
+        ${m.email || 'no email'} &nbsp;·&nbsp; ${m.phone || 'no mobile'}<br>
+        Package: <b style="color:#fff">${m.plan || '-'}</b> &nbsp;·&nbsp; Session: ${m.session || '-'}
+        &nbsp;·&nbsp; ${dstr(m.starts_at)} → <b style="color:#fff">${dstr(m.expires_at)}</b>
+        ${m.discount_note ? `<br>Discount: <b style="color:#fff">${m.discount_note}</b>` : ''}
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px">
+        ${card('Total billed', inr(billed))}
+        ${card('Total collected', inr(collected), '#3ecf8e')}
+        ${card('Balance due', balance > 0 ? inr(balance) : '₹0', balance > 0 ? '#e8112d' : '#3ecf8e')}
+      </div>
+      ${balance > 0 ? `<p class="hint" style="margin:0 0 12px">This member owes <b style="color:#e8112d">${inr(balance)}</b> — use the red <b style="color:#fff">Pending</b> button on their row to record it when they pay.</p>` : ''}
+      <div class="seg" style="margin:0 0 4px">Billing history</div>${history}`;
+    const act = await detailsModal('Member Account · ' + (m.membership_id || ''), info);
+    if (act === 'edit') await editMember(id);
+  }
+  async function renewMember(id) {
+    const plans = await getPlans();
+    const cur = _members.find((x) => x.id === id);
+    const priceOf = (name) => { const p = plans.find((x) => x.name === name); return p ? p.price : 0; };
+    const startPlan = (cur && cur.plan) || (plans[0] && plans[0].name) || 'Monthly';
+    const d = await openForm('Renew Membership', [
+      { key: 'plan', label: 'Package to renew into', type: 'select', value: startPlan, options: planSelectOptions(plans) },
+      { key: 'session', label: 'Session (which of the 4 daily slots)', type: 'select', value: (cur && cur.session) || SESSIONS[0], options: sessionOptions() },
+      { key: 'discountType', label: 'Discount (optional)', type: 'select', value: 'none', options: [['none', 'No discount'], ['percent', 'Percentage off (%)'], ['amount', 'Flat amount off (₹)']] },
+      { key: 'discountValue', label: 'Discount value (e.g. 10 = 10% or ₹10, per above)', type: 'number' },
+      { key: 'amount', label: 'Total payable (₹) — auto-filled from package & discount; edit to override', type: 'number', value: priceOf(startPlan) },
+      { key: 'cashAmount', label: 'Paid in cash now (₹) — blank = full amount in cash', type: 'number' },
+      { key: 'onlineAmount', label: 'Paid online / POS now (₹)', type: 'number' },
+      { key: 'date', label: 'Renewal date', type: 'date', value: today() },
+      { key: 'durationDays', label: 'Duration in days (blank = auto from package)', type: 'number' },
+    ], (body) => {
+      const q = (k) => body.querySelector(`[data-k="${k}"]`);
+      const planSel = q('plan'), dType = q('discountType'), dVal = q('discountValue'), amt = q('amount');
+      let overridden = false;
+      amt.addEventListener('input', () => { overridden = true; });
+      const recompute = () => {
+        if (overridden) return;
+        const price = priceOf(planSel.value);
+        const v = parseInt(dVal.value, 10) || 0;
+        let disc = 0;
+        if (v > 0 && dType.value === 'percent') disc = Math.round(price * v / 100);
+        else if (v > 0 && dType.value === 'amount') disc = v;
+        amt.value = Math.max(0, price - disc);
+      };
+      [planSel, dType, dVal].forEach((el) => { el.addEventListener('input', recompute); el.addEventListener('change', recompute); });
+      recompute();
+    });
+    if (!d) return;
+    const listPrice = priceOf(d.plan);
+    const dv = parseInt(d.discountValue, 10) || 0;
+    let discount = 0, discountNote = '';
+    if (dv > 0 && d.discountType === 'percent') { discount = Math.round(listPrice * dv / 100); discountNote = `${dv}% off (−${inr(discount)})`; }
+    else if (dv > 0 && d.discountType === 'amount') { discount = dv; discountNote = `${inr(dv)} off`; }
+    let total = parseInt(d.amount, 10) || 0;
+    if (!total) total = Math.max(0, listPrice - discount);
+    d.amount = total; d.discountNote = discountNote;
+    let cash = parseInt(d.cashAmount, 10) || 0;
+    let online = parseInt(d.onlineAmount, 10) || 0;
+    if (!cash && !online) { cash = total; d.cashAmount = String(total); }
+    const paid = cash + online;
+    const pending = Math.max(0, total - paid);
+    if (pending > 0) {
+      const tiny = pending <= 20;
+      const ok = await confirmModal('Confirm pending balance',
+        `Renewal total is <b style="color:#fff">${inr(total)}</b> and <b style="color:#fff">${inr(paid)}</b> was paid now, leaving <b style="color:#e8112d">${inr(pending)}</b> to collect later.` +
+        (tiny ? `<br><br>That's only <b style="color:#e8112d">${inr(pending)}</b> — did you mistype? Press Cancel to fix it.` : '<br><br>Record this as a pending balance?'),
+        `Yes — ${inr(pending)} due later`);
+      if (!ok) return;
+    }
+    // Online-on-machine path (only when nothing was split to cash and a terminal is configured).
+    if (TERMINAL && online > 0 && cash === 0) {
+      await chargeOnMachine({ name: cur ? cur.name : '', email: cur ? cur.email : '', phone: cur ? cur.phone : '', plan: d.plan, amount: total, session: d.session });
       loadMembers(); return;
     }
+    d.date = stampFor(d.date);
     const r = await api.send('/api/admin/members/' + id + '/renew', 'POST', d);
-    if (r.ok) await notifyModal('Membership renewed', `Valid until <b style="color:#fff">${(r.expires || '').slice(0, 10)}</b>. Invoice <b style="color:#fff">${r.invoiceNo}</b> ${r.emailed ? 'emailed.' : '(email not configured).'}`);
-    else await notifyModal('Failed', r.error || 'Could not renew.');
+    if (r.ok) {
+      const pendMsg = r.pending > 0 ? `<br><b style="color:#e8112d">${inr(r.pending)} still due</b> — use the Pending button when they pay.` : '';
+      await notifyModal('Membership renewed', `Valid until <b style="color:#fff">${dstr(r.expires)}</b>.${r.invoiceNo ? ` Invoice <b style="color:#fff">${r.invoiceNo}</b>${r.emailed ? ' emailed.' : '.'}` : ''}${pendMsg}<br>Same member row updated — see <b style="color:#fff">Details</b> for the full history.`);
+    } else await notifyModal('Failed', r.error || 'Could not renew.');
+    loadMembers();
+  }
+  // Manually edit any member's details (owner). Covers renewed values too.
+  async function editMember(id) {
+    const plans = await getPlans();
+    const m = _members.find((x) => x.id === id);
+    if (!m) return;
+    const dinp = (s) => (s ? new Date(s).toLocaleDateString('en-CA') : today());
+    const d = await openForm('Edit Member', [
+      { key: 'name', label: 'Member name', value: m.name || '' },
+      { key: 'membershipId', label: 'Membership No', value: m.membership_id || '' },
+      { key: 'email', label: 'Email', value: m.email || '' },
+      { key: 'phone', label: 'Mobile', value: m.phone || '' },
+      { key: 'plan', label: 'Package', type: 'select', value: m.plan || (plans[0] && plans[0].name), options: planSelectOptions(plans) },
+      { key: 'session', label: 'Session', type: 'select', value: m.session || SESSIONS[0], options: sessionOptions() },
+      { key: 'amount', label: 'Total amount (₹)', type: 'number', value: m.amount || 0 },
+      { key: 'cashAmount', label: 'Paid in cash (₹)', type: 'number', value: m.cash_amount || 0 },
+      { key: 'onlineAmount', label: 'Paid online / POS (₹)', type: 'number', value: m.online_amount || 0 },
+      { key: 'pendingAmount', label: 'Pending / due (₹)', type: 'number', value: m.pending_amount || 0 },
+      { key: 'startDate', label: 'Start date', type: 'date', value: dinp(m.starts_at) },
+      { key: 'expiryDate', label: 'Expiry date', type: 'date', value: dinp(m.expires_at) },
+    ]);
+    if (!d) return;
+    d.startDate = d.startDate ? new Date(d.startDate + 'T12:00:00').toISOString() : '';
+    d.expiryDate = d.expiryDate ? new Date(d.expiryDate + 'T12:00:00').toISOString() : '';
+    const r = await api.send('/api/admin/members/' + id, 'PATCH', d);
+    if (r.ok) await notifyModal('Saved', 'Member details updated.');
+    else await notifyModal('Failed', r.error || 'Could not save the changes.');
     loadMembers();
   }
   async function delMember(id, email) {
@@ -376,6 +675,32 @@
     const r = await api.send('/api/admin/members/' + id, 'DELETE');
     if (!r.ok) await notifyModal('Failed', r.error || 'Could not delete.');
     loadMembers();
+  }
+  // Import members via a clean modal dialog (keeps the members page uncluttered).
+  function openImportModal() {
+    const overlay = $('#modal');
+    const card = overlay.querySelector('.modal-card');
+    $('#modal-title').textContent = 'Import Members from Excel';
+    $('#modal-body').innerHTML = `
+      <p class="hint" style="line-height:1.75;margin-bottom:14px">First row = column headers. Columns:
+        <b style="color:#fff">membership_no, date, name, email, mobile, package, amount, paid, pending, mode_of_payment</b>.
+        Blank <b style="color:#fff">membership_no</b> auto-generates 718MMA…. Only members with an <b style="color:#fff">email</b> get reminders.
+        Dates as <b style="color:#fff">YYYY-MM-DD</b> (or DD-MM-YYYY). No emails are sent on import.</p>
+      <input id="import-file" type="file" accept=".xlsx,.xls,.csv"
+        style="width:100%;padding:11px;border:1px solid var(--line);border-radius:8px;background:var(--ink);color:#fff;font-size:14px" />
+      <div class="form-msg" id="import-out" style="margin-top:12px"></div>`;
+    $('#modal-save').textContent = 'Import Sheet';
+    $('#modal-cancel').textContent = 'Close';
+    $('#modal-cancel').style.display = '';
+    if (card) card.style.maxWidth = '560px';
+    overlay.classList.add('open');
+    const cleanup = () => {
+      overlay.classList.remove('open'); $('#modal-save').onclick = null; $('#modal-cancel').onclick = null; overlay.onclick = null;
+      $('#modal-save').textContent = 'Save'; $('#modal-cancel').textContent = 'Cancel'; if (card) card.style.maxWidth = '';
+    };
+    $('#modal-cancel').onclick = cleanup;
+    overlay.onclick = (e) => { if (e.target === overlay) cleanup(); };
+    $('#modal-save').onclick = () => importMembers();
   }
   async function importMembers() {
     const file = document.getElementById('import-file').files[0];
@@ -529,7 +854,7 @@
     else { out.className = 'form-msg err'; out.textContent = '⚠️ ' + (j.error || 'Upload failed.'); }
   }
 
-  window.ADMIN = { setEventStatus, editEvent, delEvent, setTrial, setCollab, editPlan, renewMember, delMember, delPayment, importMembers, saveClosure, clearClosure, delClass, delVideo, delDiet, uploadDiet, uploadVideoFile };
+  window.ADMIN = { setEventStatus, editEvent, delEvent, setTrial, delTrial, setCollab, delCollab, editPlan, renewMember, editMember, showDetails, delMember, delPayment, clearPending, importMembers, saveClosure, clearClosure, delClass, delVideo, delDiet, uploadDiet, uploadVideoFile };
   initLogin();
   checkAuth();
 })();

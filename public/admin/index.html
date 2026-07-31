@@ -29,25 +29,25 @@
   <!-- DASHBOARD -->
   <div class="admin-wrap" id="app" style="display:none">
     <aside class="side">
-      <div class="brand"><div class="logo" style="font-size:30px">7<b style="color:var(--red)">18</b></div><small style="font-family:var(--cond);letter-spacing:4px;font-size:10px;color:var(--grey)">ADMIN CRM</small><div id="role-badge" style="margin-top:6px;font-family:var(--cond);letter-spacing:2px;font-size:10px;color:var(--red);font-weight:700"></div></div>
-      <a data-v="dash" class="active">Dashboard</a>
-      <a data-v="events">Events</a>
-      <a data-v="trials">Trial Bookings</a>
-      <a data-v="collabs">Collaborations</a>
-      <a data-v="payments">Payments</a>
-      <a data-v="members">Members</a>
-      <a data-v="collections">Collections</a>
-      <a data-v="closure">Gym Closure</a>
-      <a data-v="classes">Classes</a>
-      <a data-v="videos">Videos</a>
-      <a data-v="diet">Diet Posts</a>
-      <a data-v="memberships">Plans</a>
-      <a href="/" style="color:var(--grey)">← Back To Site</a>
-      <a id="logout" style="color:var(--red)">Logout</a>
+      <div class="brand"><button class="side-toggle" id="side-toggle" aria-label="Collapse sidebar" title="Collapse sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></button><div class="logo" style="font-size:30px">7<b style="color:var(--red)">18</b></div><small style="font-family:var(--cond);letter-spacing:4px;font-size:10px;color:var(--grey)">ADMIN CRM</small><div id="role-badge" style="margin-top:6px;font-family:var(--cond);letter-spacing:2px;font-size:10px;color:var(--red);font-weight:700"></div></div>
+      <a data-v="dash" class="active" title="Dashboard"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg><span>Dashboard</span></a>
+      <a data-v="events" title="Events"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span>Events</span></a>
+      <a data-v="trials" title="Trial Bookings"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3"/><path d="m9 14 2 2 4-4"/></svg><span>Trial Bookings</span></a>
+      <a data-v="collabs" title="Collaborations"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Collaborations</span></a>
+      <a data-v="payments" title="Payments"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span>Payments</span></a>
+      <a data-v="members" title="Members"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Members</span></a>
+      <a data-v="collections" title="Collections"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg><span>Collections</span></a>
+      <a data-v="closure" title="Gym Closure"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M14 14l-4 4M10 14l4 4"/></svg><span>Gym Closure</span></a>
+      <a data-v="classes" title="Classes"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Classes</span></a>
+      <a data-v="videos" title="Videos"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="14" height="16" rx="2"/><path d="m22 8-6 4 6 4V8Z"/></svg><span>Videos</span></a>
+      <a data-v="diet" title="Diet Posts"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v7a2 2 0 0 0 2 2 2 2 0 0 0 2-2V3M6 12v9M18 3c-2 0-3 2-3 5s1 4 3 4v9"/></svg><span>Diet Posts</span></a>
+      <a data-v="memberships" title="Plans"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg><span>Plans</span></a>
+      <a href="/" class="rail-top nav-secondary" title="Back to site"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span>Back To Site</span></a>
+      <a id="logout" class="nav-danger" title="Logout"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span>Logout</span></a>
     </aside>
     <div class="side-overlay" id="side-overlay"></div>
     <main class="main">
-      <div class="topbar"><div style="display:flex;align-items:center;gap:12px"><button class="menu-btn" id="menu-btn" aria-label="Menu">☰</button><h1 id="title" class="text-red">Dashboard</h1></div></div>
+      <div class="topbar"><div style="display:flex;align-items:center;gap:14px"><button class="menu-btn" id="menu-btn" aria-label="Toggle sidebar" title="Toggle sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="19" height="19"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></button><h1 id="title" class="text-red">Dashboard</h1></div></div>
       <section class="view active" id="v-dash">
         <div class="seg" style="margin-top:0">Overview</div>
         <div class="cards" id="stats"></div>
@@ -77,14 +77,24 @@
       </section>
       <section class="view" id="v-payments"><div id="payments-table"></div></section>
       <section class="view" id="v-members">
-        <p class="hint" style="margin-bottom:14px">Membership is granted automatically on payment. Add walk-ins who paid offline with <b style="color:#fff">+ Add Member</b>, or <b style="color:#fff">Renew</b> an existing one — both generate an invoice and email it.</p>
-        <button class="btn btn-outline mini" id="add-member" style="margin-bottom:16px;padding:10px 18px">+ Add Member</button>
-        <div class="form" id="import-box" style="max-width:660px;margin:0 0 20px">
-          <h3 style="font-family:var(--cond);letter-spacing:1px;font-size:18px;margin-bottom:4px">Import existing members from Excel</h3>
-          <p class="hint" style="margin:6px 0 12px">First row = column headers. Columns: <b style="color:#fff">membership_id, name, email, phone, plan, session, amount, payment_mode, start_date, expiry_date</b>. Only <b style="color:#fff">email</b> is required. Leave <b style="color:#fff">membership_id</b> blank to auto-generate one. <b style="color:#fff">payment_mode</b> = cash / online / card / upi. Dates as <b style="color:#fff">YYYY-MM-DD</b>. No emails/invoices are sent for imported members.</p>
-          <input id="import-file" type="file" accept=".xlsx,.xls,.csv" />
-          <button class="btn btn-primary" style="margin-top:12px" onclick="ADMIN.importMembers()">Import Sheet</button>
-          <div class="form-msg" id="import-out"></div>
+        <div class="members-toolbar">
+          <div class="tb-actions">
+            <button class="tb-btn primary" id="add-member">＋ Add Member</button>
+            <button class="tb-btn" id="import-toggle">⇪ Import Excel</button>
+          </div>
+          <div class="search-wrap">
+            <svg class="search-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input id="member-search" type="text" placeholder="Search members by name, ID, email, mobile or package" autocomplete="off" spellcheck="false" />
+            <button id="member-search-clear" type="button" aria-label="Clear search" title="Clear">&times;</button>
+          </div>
+          <select id="member-sort" class="mini" style="padding:10px 12px;border-radius:8px">
+            <option value="recent">Sort: Recent</option>
+            <option value="id-asc">Membership ID ↑</option>
+            <option value="id-desc">Membership ID ↓</option>
+            <option value="expiry-asc">Expiry (soonest)</option>
+            <option value="name-asc">Name A–Z</option>
+          </select>
+          <span class="member-count-pill" id="member-count"></span>
         </div>
         <div id="members-table"></div>
       </section>

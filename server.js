@@ -131,28 +131,89 @@ const h = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((e) => {
 });
 
 // ----------------------------- Helpers -----------------------------------
-// Days a plan grants, parsed from its name/duration label (e.g. "MMA — 6 Months").
+// Days a plan grants. Handles "MMA — 6 Months", "MMA-12 M", "Combo-3M", "CFT-1M", "MMA-PT".
 function planDuration(plan) {
   const p = String(plan || '').toLowerCase();
-  if (/1\s*year|12\s*month|annual/.test(p)) return 365;
-  if (/6\s*month/.test(p)) return 180;
-  if (/3\s*month|quarter/.test(p)) return 90;
+  const m = p.match(/(\d+)\s*m(?:onth)?s?\b/); // "12 m", "3m", "1 month"
+  if (m) {
+    const mo = parseInt(m[1], 10);
+    if (mo === 12) return 365;
+    if (mo === 6) return 180;
+    if (mo === 3) return 90;
+    if (mo === 1) return 30;
+    return mo * 30;
+  }
+  if (/1\s*year|annual/.test(p)) return 365;
+  if (/quarter/.test(p)) return 90;
   if (/day\s*pass/.test(p)) return 1;
-  if (/1\s*month|monthly/.test(p)) return 30;
+  if (/\bpt\b|personal|training/.test(p)) return 30; // personal training ≈ 1 month
   return 30;
 }
-// Sequential member id like 718-001, 718-002 … (next = highest existing suffix + 1).
+// How many whole months a plan grants (null if it isn't month-based, e.g. day pass).
+function planMonths(plan) {
+  const p = String(plan || '').toLowerCase();
+  const m = p.match(/(\d+)\s*m(?:onth)?s?\b/);
+  if (m) return parseInt(m[1], 10);
+  if (/1\s*year|annual/.test(p)) return 12;
+  if (/quarter/.test(p)) return 3;
+  if (/\bpt\b|personal|training/.test(p)) return 1;
+  return null;
+}
+// Add whole calendar months, keeping the day-of-month (clamps for short months: Jan 31 +1 => Feb 28/29).
+function addMonths(date, n) {
+  const d = new Date(date.getTime());
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + n);
+  if (d.getDate() < day) d.setDate(0);
+  return d;
+}
+// Expiry from a start date: calendar months when the plan is month-based, else day-count.
+function expiryFrom(start, plan, durationDays) {
+  const base = (start instanceof Date && !isNaN(start)) ? start : new Date();
+  if (durationDays) return new Date(base.getTime() + durationDays * 86400000);
+  const months = planMonths(plan);
+  if (months != null) return addMonths(base, months);
+  return new Date(base.getTime() + planDuration(plan) * 86400000);
+}
+// Robust date parser for imported sheets: handles Excel serials, Date objects, ISO, US, and Indian DD-MM-YYYY.
+function parseSheetDate(v) {
+  if (v == null || v === '') return null;
+  // Excel serial number (days since 1899-12-30) → fixed UTC calendar date (no timezone drift).
+  if (typeof v === 'number' && isFinite(v) && v > 59 && v < 100000) {
+    const d = new Date(Math.round((v - 25569) * 86400000) + 43200000); // noon UTC → day is stable in any timezone
+    return isNaN(d) ? null : d;
+  }
+  if (v instanceof Date) {
+    if (isNaN(v)) return null;
+    // Normalise a timezone-shifted Date to a clean UTC calendar date.
+    return new Date(Date.UTC(v.getUTCFullYear(), v.getUTCMonth(), v.getUTCDate(), 12));
+  }
+  const s = String(v).trim();
+  const m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/);
+  if (m) {
+    let a = +m[1], b = +m[2], y = +m[3]; if (y < 100) y += 2000;
+    // Prefer DD-MM-YYYY (Indian). Fall back to MM-DD only when the first field can't be a day.
+    let day = a, mon = b;
+    if (a > 12 && b <= 12) { day = a; mon = b; }
+    else if (b > 12 && a <= 12) { day = b; mon = a; }
+    const d = new Date(y, mon - 1, day);
+    return isNaN(d) ? null : d;
+  }
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+// Sequential member id like 718MMA2, 718MMA3 … (next = highest existing number + 1).
 async function nextMemberId() {
-  const r = await db.get("SELECT split_part(membership_id,'-',2) AS n FROM user_memberships WHERE membership_id ~ '^718-[0-9]+$' ORDER BY split_part(membership_id,'-',2)::int DESC LIMIT 1");
-  const n = r && r.n ? (parseInt(r.n, 10) || 0) : 0;
-  return '718-' + String(n + 1).padStart(3, '0');
+  const r = await db.get("SELECT membership_id FROM user_memberships WHERE membership_id ~ '^718MMA[0-9]+$' ORDER BY substring(membership_id from 7)::int DESC LIMIT 1");
+  const n = r && r.membership_id ? (parseInt(r.membership_id.slice(6), 10) || 0) : 0;
+  return '718MMA' + (n + 1);
 }
 // Members keep the same id across renewals.
 async function memberIdFor(email) {
   const r = await db.get("SELECT membership_id FROM user_memberships WHERE email=$1 AND COALESCE(membership_id,'')<>'' ORDER BY created_at LIMIT 1", [email]);
   return (r && r.membership_id) || await nextMemberId();
 }
-async function grantMembership(email, plan, amount, orderId, durationDays, session, method) {
+async function grantMembership(email, plan, amount, orderId, durationDays, session, method, name, phone) {
   if (!email) return null;
   const e = email.toLowerCase();
   const days = durationDays || planDuration(plan);
@@ -161,8 +222,8 @@ async function grantMembership(email, plan, amount, orderId, durationDays, sessi
   const base = cur && cur.m ? new Date(cur.m).getTime() : Date.now();
   const expires = new Date(base + days * 86400000).toISOString();
   const memberId = await memberIdFor(e);
-  await db.run('INSERT INTO user_memberships (email, plan, amount, expires_at, razorpay_order_id, session, membership_id, method) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-    [e, plan, amount, expires, orderId || null, session || null, memberId, method || null]);
+  await db.run('INSERT INTO user_memberships (email, name, phone, plan, amount, paid_amount, pending_amount, expires_at, razorpay_order_id, session, membership_id, method) VALUES ($1,$2,$3,$4,$5,$6,0,$7,$8,$9,$10,$11)',
+    [e, name || '', phone || '', plan, amount, amount, expires, orderId || null, session || null, memberId, method || null]);
   return expires;
 }
 async function activeMembership(email) {
@@ -215,7 +276,7 @@ async function recordMembershipPayment({ name, email, phone, plan, amount, metho
   const pay = await db.get(
     "INSERT INTO payments (name,email,phone,plan,amount,status,method,session) VALUES ($1,$2,$3,$4,$5,'paid',$6,$7) RETURNING *",
     [name || '', e, phone || '', plan || 'Membership', amt, method || 'offline', session || null]);
-  const expires = await grantMembership(e, plan, amt, null, durationDays, session, method || 'offline');
+  const expires = await grantMembership(e, plan, amt, null, durationDays, session, method || 'offline', name, phone);
   const inv = await issueInvoice(pay, expires);
   return { payment: pay, expires, invoiceNo: inv.invoiceNo };
 }
@@ -510,11 +571,14 @@ app.get('/api/admin/summary', requireAdmin, h(async (req, res) => {
   await reconcileEventStatuses();
   const n = async (q) => (await db.get(q)).n;
   const owner = req.adminRole === 'owner';
-  // Active members grouped by session (one email counted once, latest membership's session).
+  // Active members grouped by session — one member counted once (keyed by membership id, not email,
+  // because many imported members share a blank email). Uses the latest membership's session.
   const sessRows = await db.all(`
     SELECT COALESCE(NULLIF(m.session,''),'Unassigned') s, COUNT(*)::int n FROM (
-      SELECT DISTINCT ON (email) email, session FROM user_memberships
-      WHERE expires_at > now() ORDER BY email, expires_at DESC
+      SELECT DISTINCT ON (COALESCE(NULLIF(membership_id,''), NULLIF(email,''), id::text))
+             session FROM user_memberships
+      WHERE expires_at > now()
+      ORDER BY COALESCE(NULLIF(membership_id,''), NULLIF(email,''), id::text), expires_at DESC
     ) m GROUP BY 1`);
   const sMap = {}; sessRows.forEach((r) => { sMap[r.s] = r.n; });
   const sessionCounts = SESSIONS.map((s) => ({ session: s, count: sMap[s] || 0 }));
@@ -528,7 +592,7 @@ app.get('/api/admin/summary', requireAdmin, h(async (req, res) => {
     // Money stats are owner-only
     payments: owner ? await n("SELECT COUNT(*)::int n FROM payments WHERE status='paid'") : null,
     revenue: owner ? await n("SELECT COALESCE(SUM(amount),0)::int n FROM payments WHERE status='paid'") : null,
-    members: await n("SELECT COUNT(DISTINCT email)::int n FROM user_memberships WHERE expires_at > now()"),
+    members: await n("SELECT COUNT(DISTINCT COALESCE(NULLIF(membership_id,''), NULLIF(email,''), id::text))::int n FROM user_memberships WHERE expires_at > now()"),
     sessionCounts,
     events: await n('SELECT COUNT(*)::int n FROM events'),
     upcoming: await n("SELECT COUNT(*)::int n FROM events WHERE status='upcoming'"),
@@ -600,14 +664,70 @@ app.get('/api/admin/payments/:id/invoice', requireOwner, h(async (req, res) => {
 app.get('/api/admin/members', requireAdmin, h(async (req, res) => res.json(await db.all('SELECT * FROM user_memberships ORDER BY expires_at DESC'))));
 // Manually trigger renewal reminder emails now (owner only) — handy for testing.
 app.post('/api/admin/reminders/run', requireOwner, h(async (req, res) => { const n = await sendRenewalReminders(); res.json({ ok: true, sent: n || 0, emailConfigured: mailerReady }); }));
-// Manually add a paid member (walk-in / offline). Creates payment + membership + invoice + email.
+// Human-readable "Mode of Payment": e.g. "₹6,000 Online + ₹2,000 Cash · ₹1,000 due"
+function paymentModeNote(cash, online, pending) {
+  const rup = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
+  const parts = [];
+  if (online > 0) parts.push(rup(online) + ' Online');
+  if (cash > 0) parts.push(rup(cash) + ' Cash');
+  let s = parts.join(' + ');
+  if (pending > 0) s += (s ? ' · ' : '') + rup(pending) + ' due';
+  return s || 'cash';
+}
+// Add a member (walk-in / offline). Captures date, cash+online split, and pending balance.
 app.post('/api/admin/members', requireAdmin, h(async (req, res) => {
-  const { name, email, phone, plan, amount, durationDays, method, session } = req.body || {};
-  if (!email) return res.status(400).json({ error: 'Member email is required (invoice + app login use it).' });
-  const pm = method === 'cash' ? 'cash' : 'online'; // machine/card/UPI recorded as online
-  const r = await recordMembershipPayment({ name, email, phone, plan, amount, method: pm, session,
-    durationDays: durationDays ? parseInt(durationDays, 10) : undefined });
-  res.json({ ok: true, expires: r.expires, invoiceNo: r.invoiceNo, emailed: mailerReady });
+  const b = req.body || {};
+  const name = (b.name || '').trim();
+  const email = (b.email || '').toLowerCase().trim();
+  const phone = (b.phone || '').trim();
+  const plan = b.plan || 'Membership';
+  const session = b.session || null;
+  const total = parseInt(b.amount, 10) || 0;
+  const cash = parseInt(b.cashAmount, 10) || 0;
+  const online = parseInt(b.onlineAmount, 10) || 0;
+  const discount = parseInt(b.discount, 10) || 0;
+  const discountNote = (b.discountNote || '').trim();
+  const paid = cash + online;
+  const pending = Math.max(0, total - paid);
+  let start = b.date ? new Date(b.date) : new Date();
+  if (isNaN(start)) start = new Date();
+  const startISO = start.toISOString();
+  const durationDays = b.durationDays ? parseInt(b.durationDays, 10) : undefined;
+  const expISO = expiryFrom(start, plan, durationDays).toISOString();
+  let memberId = (b.membershipId || '').trim();
+  if (!memberId && email) memberId = await memberIdFor(email);
+  if (!memberId) memberId = await nextMemberId();
+  const note = paymentModeNote(cash, online, pending);
+  await db.run(`INSERT INTO user_memberships
+     (email, name, phone, plan, amount, paid_amount, pending_amount, cash_amount, online_amount, discount, discount_note, starts_at, expires_at, session, membership_id, method)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+    [email, name, phone, plan, total, paid, pending, cash, online, discount, discountNote || null, startISO, expISO, session, memberId, note]);
+  const pay = await db.get(`INSERT INTO payments (name,email,phone,plan,amount,status,method,session,membership_id,note,bill_amount,due_amount,created_at) VALUES ($1,$2,$3,$4,$5,'paid',$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    [name, email, phone, plan, paid, note, session, memberId, discountNote ? ('New membership · ' + discountNote) : 'New membership', total, pending, startISO]);
+  let invoiceNo = null;
+  if (email) { const inv = await issueInvoice(pay, expISO); invoiceNo = inv.invoiceNo; } // invoice only if we have an email
+  res.json({ ok: true, memberId, expires: expISO, pending, invoiceNo, emailed: !!email && mailerReady });
+}));
+// Clear a member's pending (due) balance when they pay the rest later.
+app.post('/api/admin/members/:id/clear-pending', requireAdmin, h(async (req, res) => {
+  const m = await db.get('SELECT * FROM user_memberships WHERE id=$1', [req.params.id]);
+  if (!m) return res.status(404).json({ error: 'Member not found.' });
+  const b = req.body || {};
+  const cash = parseInt(b.cashAmount, 10) || 0;
+  const online = parseInt(b.onlineAmount, 10) || 0;
+  const clear = (cash + online) || (parseInt(b.amount, 10) || 0);
+  if (clear <= 0) return res.status(400).json({ error: 'Enter the amount received.' });
+  let when = b.date ? new Date(b.date) : new Date(); if (isNaN(when)) when = new Date();
+  const newPending = Math.max(0, (m.pending_amount || 0) - clear);
+  const newCash = (m.cash_amount || 0) + cash;
+  const newOnline = (m.online_amount || 0) + online;
+  const newPaid = (m.paid_amount || 0) + clear;
+  const note = paymentModeNote(newCash, newOnline, newPending);
+  await db.run('UPDATE user_memberships SET paid_amount=$1, pending_amount=$2, cash_amount=$3, online_amount=$4, method=$5, pending_cleared_at=$6 WHERE id=$7',
+    [newPaid, newPending, newCash, newOnline, note, newPending === 0 ? when.toISOString() : null, req.params.id]);
+  await db.run("INSERT INTO payments (name,email,phone,plan,amount,status,method,session,membership_id,note,bill_amount,due_amount,created_at) VALUES ($1,$2,$3,$4,$5,'paid',$6,$7,$8,$9,$10,$11,$12)",
+    [m.name || '', m.email || '', m.phone || '', m.plan || '', clear, paymentModeNote(cash, online, 0), m.session || null, m.membership_id || null, 'Balance payment', 0, newPending, when.toISOString()]);
+  res.json({ ok: true, pending: newPending, clearedAt: newPending === 0 ? when.toISOString() : null });
 }));
 // Delete a member and ALL their data (memberships + payments) by membership id. Owner only.
 app.delete('/api/admin/members/:id', requireOwner, h(async (req, res) => {
@@ -628,49 +748,143 @@ app.post('/api/admin/members/import', requireOwner, upload.single('file'), h(asy
   let XLSX; try { XLSX = require('xlsx'); } catch (e) { return res.status(500).json({ error: 'Excel library not installed. Run npm install.' }); }
   let rows;
   try {
-    const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
-    rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false });
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer' }); // no cellDates: dates arrive as raw serials
+    rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: true });
   } catch (e) { return res.status(400).json({ error: 'Could not read the sheet: ' + e.message }); }
   const pick = (o, ...keys) => { for (const k of Object.keys(o)) { const kk = k.toLowerCase().trim().replace(/[\s_]+/g, ''); if (keys.includes(kk)) return String(o[k]).trim(); } return ''; };
-  const toISO = (s) => { if (!s) return null; const d = new Date(s); return isNaN(d) ? null : d.toISOString(); };
+  const pickRaw = (o, ...keys) => { for (const k of Object.keys(o)) { const kk = k.toLowerCase().trim().replace(/[\s_]+/g, ''); if (keys.includes(kk)) return o[k]; } return null; };
+  const num = (s) => parseInt(String(s).replace(/[^\d]/g, ''), 10) || 0;
+  // Process oldest-first so a member's first row registers them and later rows apply as renewals.
+  const dateKeys = ['date', 'startdate', 'joindate', 'startingdate', 'joiningdate'];
+  rows.sort((a, b) => { const da = parseSheetDate(pickRaw(a, ...dateKeys)); const dbb = parseSheetDate(pickRaw(b, ...dateKeys)); return (da ? da.getTime() : 0) - (dbb ? dbb.getTime() : 0); });
   let imported = 0, skipped = 0; const errors = [];
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
-    const email = pick(r, 'email', 'emailid', 'mail').toLowerCase();
-    if (!email) { skipped++; errors.push(`Row ${i + 2}: no email`); continue; }
     const name = pick(r, 'name', 'membername', 'fullname');
-    const phone = pick(r, 'phone', 'mobile', 'contact', 'phonenumber');
-    const plan = pick(r, 'plan', 'membership', 'plantype') || 'Membership';
+    let memberId = pick(r, 'membershipno', 'membershipnumber', 'membershipid', 'memberid', 'id');
+    const email = pick(r, 'email', 'emailid', 'mail').toLowerCase();
+    // Skip a truly empty row (needs a name or a membership no)
+    if (!name && !memberId) { skipped++; continue; }
+    const phone = pick(r, 'phone', 'mobile', 'mobilenumber', 'contact', 'phonenumber');
+    const plan = pick(r, 'package', 'plan', 'membership', 'plantype') || 'Membership';
     const session = pick(r, 'session', 'batch', 'slot');
-    const amount = parseInt(pick(r, 'amount', 'amountpaid', 'fees', 'fee').replace(/[^\d]/g, ''), 10) || 0;
-    const startISO = toISO(pick(r, 'startdate', 'joindate', 'startingdate', 'joiningdate')) || new Date().toISOString();
-    let expISO = toISO(pick(r, 'expirydate', 'expiry', 'enddate', 'validtill', 'expirationdate'));
-    if (!expISO) expISO = new Date(new Date(startISO).getTime() + planDuration(plan) * 86400000).toISOString();
-    let memberId = pick(r, 'membershipid', 'memberid', 'id');
-    if (!memberId) memberId = await memberIdFor(email);
-    const mode = pick(r, 'paymentmode', 'modeofpayment', 'mode', 'method', 'paymentmethod') || 'import';
+    const amount = num(pick(r, 'amount', 'amountpaid', 'fees', 'fee', 'total'));
+    const paidCol = pick(r, 'paid', 'paidamount', 'amountpaidnow');
+    const pendingCol = pick(r, 'pending', 'pendingamount', 'due', 'balance');
+    const cash = num(pick(r, 'cash', 'cashamount'));
+    const online = num(pick(r, 'online', 'onlineamount', 'pos', 'upi'));
+    const paid = paidCol !== '' ? num(paidCol) : ((cash + online) || amount); // default: fully paid
+    const pending = pendingCol !== '' ? num(pendingCol) : Math.max(0, amount - paid);
+    const startDate = parseSheetDate(pickRaw(r, 'date', 'startdate', 'joindate', 'startingdate', 'joiningdate')) || new Date();
+    const startISO = startDate.toISOString();
+    const expExplicit = parseSheetDate(pickRaw(r, 'expirydate', 'expiry', 'enddate', 'validtill', 'expirationdate'));
+    const expISO = (expExplicit || expiryFrom(startDate, plan)).toISOString();
+    // Renewal rows in the sheet reuse the same membership_no — find the member if they already exist.
+    let existing = null;
+    if (memberId) existing = await db.get('SELECT * FROM user_memberships WHERE membership_id=$1', [memberId]);
+    if (!existing && email) existing = await db.get('SELECT * FROM user_memberships WHERE email=$1 ORDER BY created_at LIMIT 1', [email]);
+    if (!memberId) memberId = existing ? existing.membership_id : (email ? await memberIdFor(email) : await nextMemberId());
+    const mode = pick(r, 'modeofpayment', 'paymentmode', 'mode', 'method', 'paymentmethod') || paymentModeNote(cash, online, pending);
     try {
-      await db.run('INSERT INTO user_memberships (email, plan, amount, starts_at, expires_at, session, membership_id, method) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-        [email, plan, amount, startISO, expISO, session || null, memberId, mode]);
-      await db.run("INSERT INTO payments (name,email,phone,plan,amount,status,method,session,created_at) VALUES ($1,$2,$3,$4,$5,'paid',$6,$7,$8)",
-        [name || '', email, phone || '', plan, amount, mode, session || null, startISO]);
+      if (existing) {
+        // Treat as a renewal on the existing member: extend expiry, stack amounts, add a ledger line.
+        const cur = existing.expires_at ? new Date(existing.expires_at) : startDate;
+        const base = cur.getTime() > startDate.getTime() ? cur : startDate;
+        const rExp = (expExplicit || expiryFrom(base, plan)).toISOString();
+        await db.run(`UPDATE user_memberships SET plan=$1, amount=$2,
+           paid_amount=COALESCE(paid_amount,0)+$3, pending_amount=COALESCE(pending_amount,0)+$4,
+           cash_amount=COALESCE(cash_amount,0)+$5, online_amount=COALESCE(online_amount,0)+$6,
+           expires_at=$7, session=COALESCE(NULLIF($8,''),session), method=$9,
+           name=COALESCE(NULLIF($10,''),name), phone=COALESCE(NULLIF($11,''),phone), email=COALESCE(NULLIF($12,''),email)
+           WHERE id=$13`,
+          [plan, amount, paid, pending, cash, online, rExp, session || '', mode, name || '', phone || '', email || '', existing.id]);
+        await db.run("INSERT INTO payments (name,email,phone,plan,amount,status,method,session,membership_id,note,bill_amount,due_amount,created_at) VALUES ($1,$2,$3,$4,$5,'paid',$6,$7,$8,$9,$10,$11,$12)",
+          [name || existing.name || '', email || existing.email || '', phone || existing.phone || '', plan, paid, mode, session || null, memberId, 'Renewal (import)', amount, pending, startISO]);
+      } else {
+        await db.run(`INSERT INTO user_memberships (email, name, phone, plan, amount, paid_amount, pending_amount, cash_amount, online_amount, starts_at, expires_at, session, membership_id, method)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+          [email, name, phone, plan, amount, paid, pending, cash, online, startISO, expISO, session || null, memberId, mode]);
+        await db.run("INSERT INTO payments (name,email,phone,plan,amount,status,method,session,membership_id,note,bill_amount,due_amount,created_at) VALUES ($1,$2,$3,$4,$5,'paid',$6,$7,$8,$9,$10,$11,$12)",
+          [name || '', email, phone || '', plan, paid, mode, session || null, memberId, 'Imported', amount, pending, startISO]);
+      }
       imported++;
-    } catch (e) { skipped++; errors.push(`Row ${i + 2} (${email}): ${e.message}`); }
+    } catch (e) { skipped++; errors.push(`Row ${i + 2} (${name || memberId}): ${e.message}`); }
   }
   res.json({ ok: true, imported, skipped, total: rows.length, errors: errors.slice(0, 20) });
 }));
-// Renew a member's subscription (offline). Extends expiry from current end date.
+// Renew a member's subscription (offline). Extends the SAME row's expiry — no new member row.
+// Logs the renewal as a payment tied to the member id (shows in Details history).
 app.post('/api/admin/members/:id/renew', requireAdmin, h(async (req, res) => {
   const m = await db.get('SELECT * FROM user_memberships WHERE id=$1', [req.params.id]);
   if (!m) return res.status(404).json({ error: 'Membership not found.' });
-  const plan = (req.body && req.body.plan) || m.plan;
-  const amount = (req.body && req.body.amount != null) ? req.body.amount : m.amount;
-  const durationDays = req.body && req.body.durationDays ? parseInt(req.body.durationDays, 10) : undefined;
-  const pm = (req.body && req.body.method) === 'cash' ? 'cash' : 'online';
-  const session = (req.body && req.body.session) || m.session || null;
-  const u = await db.get('SELECT name FROM users WHERE email=$1', [m.email]);
-  const r = await recordMembershipPayment({ name: u ? u.name : '', email: m.email, phone: '', plan, amount, method: pm, durationDays, session });
-  res.json({ ok: true, expires: r.expires, invoiceNo: r.invoiceNo, emailed: mailerReady });
+  const b = req.body || {};
+  const plan = b.plan || m.plan;
+  const total = (b.amount != null && b.amount !== '') ? (parseInt(b.amount, 10) || 0) : (m.amount || 0);
+  let cash = parseInt(b.cashAmount, 10) || 0;
+  let online = parseInt(b.onlineAmount, 10) || 0;
+  // If no split was entered, treat the whole amount as paid in cash (never silently "all pending").
+  if (!cash && !online) { if ((b.method || '') === 'online') online = total; else cash = total; }
+  const paidNow = cash + online;
+  const renewPending = Math.max(0, total - paidNow);
+  const pm = paymentModeNote(cash, online, renewPending);
+  const discountNote = (b.discountNote || '').trim();
+  const durationDays = b.durationDays ? parseInt(b.durationDays, 10) : undefined;
+  const session = b.session || m.session || null;
+  // Extend from the current expiry if still active, else from the renewal date.
+  let when = b.date ? new Date(b.date) : new Date(); if (isNaN(when)) when = new Date();
+  const curExp = m.expires_at ? new Date(m.expires_at).getTime() : 0;
+  const base = new Date(curExp > when.getTime() ? curExp : when.getTime());
+  const newExp = expiryFrom(base, plan, durationDays).toISOString();
+  const newPending = (m.pending_amount || 0) + renewPending;
+  await db.run(`UPDATE user_memberships SET plan=$1, amount=$2,
+     paid_amount=COALESCE(paid_amount,0)+$3, pending_amount=$4,
+     cash_amount=COALESCE(cash_amount,0)+$5, online_amount=COALESCE(online_amount,0)+$6,
+     expires_at=$7, session=$8, method=$9, discount_note=COALESCE($10, discount_note) WHERE id=$11`,
+    [plan, total, paidNow, newPending, cash, online, newExp, session, pm, discountNote || null, req.params.id]);
+  const pay = await db.get(`INSERT INTO payments (name,email,phone,plan,amount,status,method,session,membership_id,note,bill_amount,due_amount,created_at) VALUES ($1,$2,$3,$4,$5,'paid',$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    [m.name || '', m.email || '', m.phone || '', plan, paidNow, pm, session, m.membership_id || null, discountNote ? ('Renewal · ' + discountNote) : 'Renewal', total, renewPending, when.toISOString()]);
+  let invoiceNo = null;
+  if (m.email) { const inv = await issueInvoice(pay, newExp); invoiceNo = inv.invoiceNo; }
+  res.json({ ok: true, expires: newExp, pending: renewPending, invoiceNo, emailed: !!m.email && mailerReady });
+}));
+// Edit any member's details by hand (owner only). Recomputes the Mode-of-payment note.
+app.patch('/api/admin/members/:id', requireOwner, h(async (req, res) => {
+  const m = await db.get('SELECT * FROM user_memberships WHERE id=$1', [req.params.id]);
+  if (!m) return res.status(404).json({ error: 'Member not found.' });
+  const b = req.body || {};
+  const g = (k, dflt) => (b[k] != null && b[k] !== '') ? b[k] : dflt;
+  const name = g('name', m.name);
+  const email = String(g('email', m.email) || '').toLowerCase();
+  const phone = g('phone', m.phone);
+  const plan = g('plan', m.plan);
+  const session = g('session', m.session);
+  const membershipId = g('membershipId', m.membership_id);
+  const amount = parseInt(g('amount', m.amount), 10) || 0;
+  const cash = parseInt(g('cashAmount', m.cash_amount), 10) || 0;
+  const online = parseInt(g('onlineAmount', m.online_amount), 10) || 0;
+  const pending = parseInt(g('pendingAmount', m.pending_amount), 10) || 0;
+  const paid = cash + online;
+  const starts = b.startDate ? new Date(b.startDate).toISOString() : m.starts_at;
+  const expires = b.expiryDate ? new Date(b.expiryDate).toISOString() : m.expires_at;
+  const note = paymentModeNote(cash, online, pending);
+  await db.run(`UPDATE user_memberships SET name=$1, email=$2, phone=$3, plan=$4, session=$5, membership_id=$6,
+     amount=$7, paid_amount=$8, pending_amount=$9, cash_amount=$10, online_amount=$11, starts_at=$12, expires_at=$13, method=$14
+     WHERE id=$15`,
+    [name, email, phone, plan, session, membershipId, amount, paid, pending, cash, online, starts, expires, note, req.params.id]);
+  res.json({ ok: true });
+}));
+// Full member detail + transaction history (with timestamps). Powers the "Details" button.
+app.get('/api/admin/members/:id/details', requireAdmin, h(async (req, res) => {
+  const m = await db.get('SELECT * FROM user_memberships WHERE id=$1', [req.params.id]);
+  if (!m) return res.status(404).json({ error: 'Member not found.' });
+  const payments = await db.all(
+    `SELECT id, amount, method, note, session, bill_amount, due_amount, created_at FROM payments
+     WHERE status='paid' AND (
+       (COALESCE(membership_id,'') <> '' AND membership_id = $1)
+       OR (COALESCE($2,'') <> '' AND email = $2)
+     ) ORDER BY created_at ASC`,
+    [m.membership_id || '', m.email || '']);
+  res.json({ member: m, payments });
 }));
 
 // ----------------------------- Collections & cash handover ----------------
