@@ -117,6 +117,9 @@
         if (f.type === 'file') {
           return `<label>${f.label}</label><input type="file" data-k="${f.key}" data-file="1" accept="${f.accept || 'image/*'}" />`;
         }
+        if (f.type === 'checkbox') {
+          return `<label class="chk" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:12px"><input type="checkbox" data-k="${f.key}" style="width:auto;margin:0" ${f.value ? 'checked' : ''} /> <span>${f.label}</span></label>`;
+        }
         return `<label>${f.label}</label><input type="${f.type || 'text'}" data-k="${f.key}" placeholder="${f.placeholder || ''}" value="${f.value || ''}" />`;
       }).join('');
       overlay.classList.add('open');
@@ -126,7 +129,7 @@
       const close = (val) => { overlay.classList.remove('open'); $('#modal-save').onclick = null; $('#modal-cancel').onclick = null; overlay.onclick = null; resolve(val); };
       $('#modal-save').onclick = () => {
         const out = {};
-        body.querySelectorAll('[data-k]').forEach((el) => { out[el.dataset.k] = el.dataset.file ? (el.files[0] || null) : el.value.trim(); });
+        body.querySelectorAll('[data-k]').forEach((el) => { out[el.dataset.k] = el.type === 'checkbox' ? el.checked : (el.dataset.file ? (el.files[0] || null) : el.value.trim()); });
         if (fields[0] && !out[fields[0].key]) { body.querySelector('[data-k]').style.borderColor = 'var(--red)'; return; }
         close(out);
       };
@@ -267,28 +270,40 @@
   async function delEvent(id) { if (confirm('Delete this event?')) { await api.send('/api/admin/events/' + id, 'DELETE'); loadEvents(); } }
 
   // Status is auto-derived from the date, so it isn't in the form.
+  const TBA = 'To be announced';
   const eventFields = (e = {}) => ([
     { key: 'title', label: 'Event title', value: e.title || '' },
-    { key: 'event_date', label: 'Date (drives status automatically)', type: 'date', value: e.event_date || '' },
+    { key: 'event_date', label: 'Date (drives status automatically)', type: 'date', value: e.event_date === TBA ? '' : (e.event_date || '') },
+    { key: 'tba', label: 'Date: To be announced (use when the date is not finalized)', type: 'checkbox', value: e.event_date === TBA },
     { key: 'location', label: 'Location', value: e.location || '718 MMA, Shivarampally' },
     { key: 'description', label: 'Short description', type: 'textarea', value: e.description || '' },
     { key: 'imageFile', label: 'Upload new image (optional)', type: 'file', accept: 'image/*' },
     { key: 'image', label: 'or Image URL', placeholder: 'https://...', value: e.image || '' },
   ]);
+  // Grey out / ignore the date input while "To be announced" is ticked.
+  const wireTba = (body) => {
+    const chk = body.querySelector('[data-k="tba"]');
+    const dateEl = body.querySelector('[data-k="event_date"]');
+    if (!chk || !dateEl) return;
+    const sync = () => { dateEl.disabled = chk.checked; dateEl.style.opacity = chk.checked ? '.45' : '1'; };
+    chk.addEventListener('change', sync); sync();
+  };
   $('#add-event').addEventListener('click', async () => {
-    const d = await openForm('Add Event', eventFields());
+    const d = await openForm('Add Event', eventFields(), wireTba);
     if (!d) return;
+    const event_date = d.tba ? TBA : d.event_date;
     let image = await uploadImageFile(d.imageFile); if (image === null) return;
     image = image || d.image || 'https://images.unsplash.com/photo-1605296867304-46d5465a13f1?w=900&q=70&auto=format&fit=crop';
-    await api.send('/api/admin/events', 'POST', { title: d.title, event_date: d.event_date, location: d.location, description: d.description, image }); loadEvents();
+    await api.send('/api/admin/events', 'POST', { title: d.title, event_date, location: d.location, description: d.description, image }); loadEvents();
   });
   async function editEvent(id) {
     const e = _events.find((x) => x.id === id); if (!e) return;
-    const d = await openForm('Edit Event', eventFields(e));
+    const d = await openForm('Edit Event', eventFields(e), wireTba);
     if (!d) return;
+    const event_date = d.tba ? TBA : d.event_date;
     let image = await uploadImageFile(d.imageFile); if (image === null) return;
     image = image || d.image || e.image;
-    await api.send('/api/admin/events/' + id, 'PATCH', { title: d.title, event_date: d.event_date, location: d.location, description: d.description, image }); loadEvents();
+    await api.send('/api/admin/events/' + id, 'PATCH', { title: d.title, event_date, location: d.location, description: d.description, image }); loadEvents();
   }
 
   async function loadTrials() {

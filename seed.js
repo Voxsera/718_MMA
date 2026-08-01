@@ -2,7 +2,9 @@
  * Seeds the database (Supabase/Postgres) with demo data for 718 MMA Gym.
  * Run directly:  npm run seed
  * Or imported by server.js and awaited on first boot.
- * Wipes and reloads the seed tables (courses/memberships/trainers/foods/reviews/events);
+ * Wipes and reloads the seed tables (courses/memberships/trainers/foods/reviews);
+ * events are seed-if-empty (only inserted when the events table is empty, so
+ * admin-managed events are never overwritten).
  * it does NOT touch bookings, payments, users or memberships.
  */
 require('dotenv').config();
@@ -16,6 +18,7 @@ const courses = [
   ['kickboxing', 'Kickboxing', 'Power & Cardio', 'Explosive kicks and punches with high-intensity conditioning. Burn fat, build power, learn to fight.', '/course-kickboxing.png', 3],
   ['boxing', 'Boxing', 'The Sweet Science', 'Footwork, head movement and crisp punches. From first-timers to competitors, build hands of stone.', '/course-boxing.png', 4],
   ['jujutsu', 'Jujutsu', 'Traditional Grappling', 'Classic Japanese jujutsu — joint locks, throws and self-defense fundamentals for every body type.', '/course-jujutsu.png', 5],
+  ['judo', 'Judo', 'The Gentle Way', 'Balance, grips and explosive throws. Learn to off-balance opponents and take them down with classical Judo, then control the ground.', '/judo.jpeg', 6],
   ['wrestling', 'Wrestling', 'Takedowns & Control', 'Olympic-style wrestling. Master takedowns, scrambles and top control — the backbone of MMA.', '/course-wrestling.png', 7],
   ['crossfit', 'CrossFit', 'Functional Strength', 'Strength and conditioning built for fighters and everyone else. Move better, hit harder, last longer.', '/course-crossfit.png', 8],
 ];
@@ -97,7 +100,6 @@ async function seed() {
   await db.run('DELETE FROM trainers');
   await db.run('DELETE FROM foods');
   await db.run('DELETE FROM reviews');
-  await db.run('DELETE FROM events');
   await db.run('DELETE FROM classes');
   await db.run('DELETE FROM videos');
 
@@ -106,11 +108,19 @@ async function seed() {
   for (const r of trainers) await db.run('INSERT INTO trainers (name,specialty,fee,bio,image) VALUES ($1,$2,$3,$4,$5)', r);
   for (const r of foods) await db.run('INSERT INTO foods (name,category,description,calories,protein,image,order_url) VALUES ($1,$2,$3,$4,$5,$6,$7)', r);
   for (const r of reviews) await db.run('INSERT INTO reviews (author,rating,text,relative_time) VALUES ($1,$2,$3,$4)', r);
-  for (const r of events) await db.run('INSERT INTO events (title,description,event_date,location,image,status) VALUES ($1,$2,$3,$4,$5,$6)', r);
+  // Events are "seed if empty": a fresh (empty) database gets the sample events,
+  // but an existing events table (managed via the admin portal) is left untouched.
+  const existingEvents = await db.get('SELECT COUNT(*)::int AS n FROM events');
+  if (!existingEvents || existingEvents.n === 0) {
+    for (const r of events) await db.run('INSERT INTO events (title,description,event_date,location,image,status) VALUES ($1,$2,$3,$4,$5,$6)', r);
+    console.log('  ↳ events table was empty — seeded sample events.');
+  } else {
+    console.log(`  ↳ events left untouched (${existingEvents.n} already present).`);
+  }
   for (const r of classes) await db.run('INSERT INTO classes (title,discipline,day_of_week,start_time,end_time,capacity,coach) VALUES ($1,$2,$3,$4,$5,$6,$7)', r);
   for (const r of videos) await db.run('INSERT INTO videos (title,discipline,level,url,thumbnail,duration,sort) VALUES ($1,$2,$3,$4,$5,$6,$7)', r);
 
-  console.log('✅ Seeded: courses, memberships, trainers, foods, reviews, events.');
+  console.log('✅ Seeded: courses, memberships, trainers, foods, reviews (events only if empty).');
 }
 
 module.exports = seed;
