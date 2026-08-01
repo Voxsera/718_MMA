@@ -46,7 +46,7 @@ export default function About() {
                 Saif <span className="text-red">“Thai Boxer”</span>
               </h3>
               <p className="section-intro" style={{ marginTop: 16 }}>
-                A professional Muay Thai coach certified in Bangkok, Thailand, Coach Saif brings over a decade in martial
+                A professional Muay Thai coach certified in Bangkok, Thailand, Coach Saif brings over 15 years in martial
                 arts to the 718 mats. A national champion across multiple Muay Thai and MMA events in India, he has trained
                 500+ students throughout Telangana.
               </p>
@@ -57,7 +57,7 @@ export default function About() {
                 to fighters.
               </p>
               <div className="coach-badges">
-                {['Bangkok-Certified', '10+ Years Experience', 'National Champion', '500+ Students Trained'].map((b) => (
+                {['Bangkok-Certified', '15+ Years Experience', 'National Champion', '500+ Students Trained'].map((b) => (
                   <span key={b} className="coach-badge">{b}</span>
                 ))}
               </div>
@@ -69,6 +69,29 @@ export default function About() {
           .coach-badges{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
           .coach-badge{font-family:var(--cond);font-weight:600;letter-spacing:1.5px;text-transform:uppercase;font-size:13px;color:var(--grey-light);border:1px solid var(--line);border-left:3px solid var(--red);padding:8px 14px;background:var(--ink-2)}
         `}</style>
+      </section>
+
+      {/* GET CERTIFIED */}
+      <section id="certification" style={{ scrollMarginTop: 90 }}>
+        <div className="container split" style={{ alignItems: 'center' }}>
+          <Reveal>
+            <div className="section-label">Certification</div>
+            <h2 className="section-title">Get Certified <span className="text-red">With Us</span></h2>
+            <p className="section-intro" style={{ marginTop: 16 }}>
+              Train, test and earn official certification at 718 MMA. Our programs let you grade your
+              skills under certified coaches and walk away with recognition for the work you put in on the mats.
+            </p>
+            <p style={{ color: 'var(--grey-light)', marginTop: 14 }}>
+              Every certificate is awarded on merit — assessed by our coaching team and backed by the
+              718 MMA name. Ask any coach at the gym about upcoming gradings and how to enroll.
+            </p>
+            <Link to="/trial" className="btn btn-primary" style={{ marginTop: 26 }}>Start Training →</Link>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <img src="/certificate.jpeg" alt="718 MMA official certificate"
+              style={{ width: '100%', maxHeight: 'clamp(300px, 80vw, 480px)', objectFit: 'contain', background: 'var(--ink-2)', border: '1px solid var(--line)', borderRadius: 6, padding: 12 }} />
+          </Reveal>
+        </div>
       </section>
 
       <section style={{ background: 'var(--ink)' }}>

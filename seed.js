@@ -17,7 +17,7 @@ const courses = [
   ['muay-thai', 'Muay Thai', 'The Art of Eight Limbs', 'Fists, elbows, knees and shins. Sharpen your stand-up game with authentic Thai boxing under experienced coaches.', '/course-muay-thai.png', 2],
   ['kickboxing', 'Kickboxing', 'Power & Cardio', 'Explosive kicks and punches with high-intensity conditioning. Burn fat, build power, learn to fight.', '/course-kickboxing.png', 3],
   ['boxing', 'Boxing', 'The Sweet Science', 'Footwork, head movement and crisp punches. From first-timers to competitors, build hands of stone.', '/course-boxing.png', 4],
-  ['jujutsu', 'Jujutsu', 'Traditional Grappling', 'Classic Japanese jujutsu — joint locks, throws and self-defense fundamentals for every body type.', '/course-jujutsu.png', 5],
+  ['jujutsu', 'Jiu-Jitsu', 'Traditional Grappling', 'Classic jiu-jitsu — joint locks, throws and self-defense fundamentals for every body type.', '/course-jujutsu.png', 5],
   ['judo', 'Judo', 'The Gentle Way', 'Balance, grips and explosive throws. Learn to off-balance opponents and take them down with classical Judo, then control the ground.', '/judo.jpeg', 6],
   ['wrestling', 'Wrestling', 'Takedowns & Control', 'Olympic-style wrestling. Master takedowns, scrambles and top control — the backbone of MMA.', '/course-wrestling.png', 7],
   ['crossfit', 'CrossFit', 'Functional Strength', 'Strength and conditioning built for fighters and everyone else. Move better, hit harder, last longer.', '/course-crossfit.png', 8],
@@ -42,7 +42,7 @@ const memberships = [
 ];
 
 const trainers = [
-  ['Coach Saif "Thai Boxer"', 'Muay Thai & Striking', 9000, 'Professional Muay Thai coach certified in Bangkok with 10+ years in martial arts. National Muay Thai & MMA champion who has trained 500+ students across Telangana. Leads the 718 stand-up, clinch and striking program for all levels.', '/saif_thai_boxer.png'],
+  ['Coach Saif "Thai Boxer"', 'Muay Thai & Striking', 9000, 'Professional Muay Thai coach certified in Bangkok with 15+ years in martial arts. National Muay Thai & MMA champion who has trained 500+ students across Telangana. Leads the 718 stand-up, clinch and striking program for all levels.', '/saif_thai_boxer.png'],
 ];
 
 const foods = [
