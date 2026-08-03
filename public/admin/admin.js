@@ -93,7 +93,7 @@
     $('#v-' + v).classList.add('active');
     $('#title').textContent = a.textContent.replace(/[^\w\s]/g, '').trim();
     closeMenu(); // collapse drawer on mobile after picking a section
-    ({ dash: loadDash, events: loadEvents, trials: loadTrials, collabs: loadCollabs, payments: loadPayments, members: loadMembers, collections: loadCollections, closure: loadClosure, classes: loadClasses, videos: loadVideos, diet: loadDiet, memberships: loadPlans }[v])();
+    ({ dash: loadDash, events: loadEvents, certs: loadCerts, trials: loadTrials, collabs: loadCollabs, payments: loadPayments, members: loadMembers, collections: loadCollections, closure: loadClosure, classes: loadClasses, videos: loadVideos, diet: loadDiet, memberships: loadPlans }[v])();
   }));
 
   const tbl = (cols, rows) => `<table><thead><tr>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
@@ -304,6 +304,58 @@
     let image = await uploadImageFile(d.imageFile); if (image === null) return;
     image = image || d.image || e.image;
     await api.send('/api/admin/events/' + id, 'PATCH', { title: d.title, event_date, location: d.location, description: d.description, image }); loadEvents();
+  }
+
+  // ---- Certificates ----
+  let _certs = [];
+  async function loadCerts() {
+    const rows = await api.get('/api/admin/certificates'); if (!rows) return;
+    _certs = rows;
+    $('#certs-table').innerHTML = rows.length ? tbl(['Cert ID', 'Name', 'Course', 'Date', 'Photo', 'Public Link', 'Manage'], rows.map((c) => `
+      <tr><td><b style="color:#fff">${c.cert_id}</b></td><td>${c.name}</td><td>${c.course || '-'}</td><td>${c.cert_date || '-'}</td>
+        <td>${c.photo ? '✓' : '—'}</td>
+        <td><a href="/certifications/${encodeURIComponent(c.cert_id)}" target="_blank" style="color:var(--red)">/certifications/${c.cert_id}</a></td>
+        <td><button class="mini" onclick="ADMIN.editCert(${c.id})">Edit</button>
+          <button class="mini" onclick="ADMIN.delCert(${c.id})">Delete</button></td></tr>`)) : '<p class="hint">No certificates yet — add the first one.</p>';
+  }
+  const certFields = (c = {}) => ([
+    { key: 'name', label: 'Person name', value: c.name || '' },
+    { key: 'cert_id', label: 'Certificate ID — goes in the QR link (e.g. 718-MT-001)', value: c.cert_id || '', placeholder: '718-MT-001' },
+    { key: 'course', label: 'Course / discipline', value: c.course || '', placeholder: 'Muay Thai' },
+    { key: 'cert_date', label: 'Certified on', type: 'date', value: c.cert_date || '' },
+    { key: 'imageFile', label: 'Upload certificate image', type: 'file', accept: 'image/*' },
+    { key: 'image', label: 'or certificate image URL', placeholder: 'https://...', value: c.image || '' },
+    { key: 'photoFile', label: 'Upload person photo (optional)', type: 'file', accept: 'image/*' },
+    { key: 'photo', label: 'or person photo URL (optional)', placeholder: 'https://...', value: c.photo || '' },
+  ]);
+  $('#add-cert').addEventListener('click', async () => {
+    const d = await openForm('Add Certificate', certFields());
+    if (!d) return;
+    if (!d.cert_id) { await notifyModal('Missing ID', 'Certificate ID is required — it becomes the QR link.'); return; }
+    let image = await uploadImageFile(d.imageFile); if (image === null) return;
+    image = image || d.image || '';
+    let photo = await uploadImageFile(d.photoFile); if (photo === null) return;
+    photo = photo || d.photo || '';
+    const r = await api.send('/api/admin/certificates', 'POST', { cert_id: d.cert_id, name: d.name, course: d.course, cert_date: d.cert_date, image, photo });
+    if (r && r.error) { await notifyModal('Could not save', r.error); }
+    loadCerts();
+  });
+  async function editCert(id) {
+    const c = _certs.find((x) => x.id === id); if (!c) return;
+    const d = await openForm('Edit Certificate', certFields(c));
+    if (!d) return;
+    if (!d.cert_id) { await notifyModal('Missing ID', 'Certificate ID is required — it becomes the QR link.'); return; }
+    let image = await uploadImageFile(d.imageFile); if (image === null) return;
+    image = image || d.image || c.image;
+    let photo = await uploadImageFile(d.photoFile); if (photo === null) return;
+    photo = photo || d.photo || '';
+    const r = await api.send('/api/admin/certificates/' + id, 'PATCH', { cert_id: d.cert_id, name: d.name, course: d.course, cert_date: d.cert_date, image, photo });
+    if (r && r.error) { await notifyModal('Could not save', r.error); }
+    loadCerts();
+  }
+  async function delCert(id) {
+    const ok = await confirmModal('Delete certificate', 'Delete this certificate? Its QR link will stop working. This cannot be undone.', 'Delete');
+    if (ok) { await api.send('/api/admin/certificates/' + id, 'DELETE'); loadCerts(); }
   }
 
   async function loadTrials() {
@@ -869,7 +921,7 @@
     else { out.className = 'form-msg err'; out.textContent = '⚠️ ' + (j.error || 'Upload failed.'); }
   }
 
-  window.ADMIN = { setEventStatus, editEvent, delEvent, setTrial, delTrial, setCollab, delCollab, editPlan, renewMember, editMember, showDetails, delMember, delPayment, clearPending, importMembers, saveClosure, clearClosure, delClass, delVideo, delDiet, uploadDiet, uploadVideoFile };
+  window.ADMIN = { setEventStatus, editEvent, delEvent, editCert, delCert, setTrial, delTrial, setCollab, delCollab, editPlan, renewMember, editMember, showDetails, delMember, delPayment, clearPending, importMembers, saveClosure, clearClosure, delClass, delVideo, delDiet, uploadDiet, uploadVideoFile };
   initLogin();
   checkAuth();
 })();

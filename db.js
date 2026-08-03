@@ -97,6 +97,13 @@ async function init() {
       sent_at TIMESTAMPTZ DEFAULT now(), UNIQUE(membership_id, days_before)
     );
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS certificates (
+      id SERIAL PRIMARY KEY, cert_id TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
+      course TEXT, cert_date TEXT, image TEXT, photo TEXT, created_at TIMESTAMPTZ DEFAULT now()
+    );
+  `);
+  await pool.query(`ALTER TABLE certificates ADD COLUMN IF NOT EXISTS photo TEXT`);
   // --- Migrations (safe to run every boot) ---
   await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS invoice_no TEXT`);
   await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS method TEXT DEFAULT 'online'`);

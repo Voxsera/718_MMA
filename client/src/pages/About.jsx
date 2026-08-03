@@ -82,13 +82,16 @@ export default function About() {
               skills under certified coaches and walk away with recognition for the work you put in on the mats.
             </p>
             <p style={{ color: 'var(--grey-light)', marginTop: 14 }}>
-              Every certificate is awarded on merit — assessed by our coaching team and backed by the
-              718 MMA name. Ask any coach at the gym about upcoming gradings and how to enroll.
+              Every certificate carries a unique ID and QR code — scan it to verify the certification
+              instantly on our site. Ask any coach about upcoming gradings and how to enroll.
             </p>
-            <Link to="/trial" className="btn btn-primary" style={{ marginTop: 26 }}>Start Training →</Link>
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 26 }}>
+              <Link to="/certifications" className="btn btn-primary">View Certifications →</Link>
+              <Link to="/trial" className="btn btn-outline">Start Training →</Link>
+            </div>
           </Reveal>
           <Reveal delay={0.1}>
-            <img src="/certificate.jpeg" alt="718 MMA official certificate"
+            <img src="/dummy-certificate.png" alt="718 MMA official certificate"
               style={{ width: '100%', maxHeight: 'clamp(300px, 80vw, 480px)', objectFit: 'contain', background: 'var(--ink-2)', border: '1px solid var(--line)', borderRadius: 6, padding: 12 }} />
           </Reveal>
         </div>

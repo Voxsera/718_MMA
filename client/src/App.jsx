@@ -15,6 +15,8 @@ import Food from './pages/Food.jsx';
 import Collaboration from './pages/Collaboration.jsx';
 import Trial from './pages/Trial.jsx';
 import About from './pages/About.jsx';
+import Certifications from './pages/Certifications.jsx';
+import CertificationDetail from './pages/CertificationDetail.jsx';
 import Merchandise from './pages/Merchandise.jsx';
 import Physio from './pages/Physio.jsx';
 import Login from './pages/Login.jsx';
@@ -48,6 +50,8 @@ export default function App() {
           <Route path="/collaboration" element={<Collaboration />} />
           <Route path="/trial" element={<Trial />} />
           <Route path="/about" element={<About />} />
+          <Route path="/certifications" element={<Certifications />} />
+          <Route path="/certifications/:certId" element={<CertificationDetail />} />
           <Route path="/merchandise" element={<Merchandise />} />
           <Route path="/physio" element={<Physio />} />
           <Route path="/login" element={<Login />} />
