@@ -15,6 +15,7 @@ const HIGHLIGHTS = {
   kickboxing: ['Explosive kick and punch combinations', 'High-intensity cardio and fat burn', 'Footwork and timing fundamentals'],
   boxing: ['Footwork, head movement and defense', 'Crisp combinations on pads and bags', 'From first-timers to competitors'],
   jujutsu: ['Joint locks, throws and breakfalls', 'Practical self-defense fundamentals', 'Suited to every body type'],
+  judo: ['Grips, balance and explosive throws', 'Breakfalls and safe throwing technique', 'Newaza — pins, holds and ground control'],
   bjj: ['Leverage and technique over strength', 'Guard, passing, sweeps and submissions', 'Gi and positional sparring'],
   wrestling: ['Takedowns, scrambles and top control', 'The backbone of a strong MMA game', 'Olympic-style technique and drilling'],
   crossfit: ['Functional strength and conditioning', 'Built for fighters and everyone else', 'Move better, hit harder, last longer'],

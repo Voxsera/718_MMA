@@ -7,7 +7,7 @@ import { TestimonialsColumn } from '../components/TestimonialsColumns.jsx';
 import { api } from '../api';
 
 const STATUS_PILL = { upcoming: 'pill-red', ongoing: 'pill-green', past: 'pill-grey' };
-const HERO_IMG = 'https://images.unsplash.com/photo-1549719386-74dfcbf7dbed?w=1800&q=80&auto=format&fit=crop';
+const HERO_IMG = '/hero.png';
 
 // ── HERO TITLE FONT ──────────────────────────────────────────────
 // Uncomment ONE line to try that font in the hero heading.

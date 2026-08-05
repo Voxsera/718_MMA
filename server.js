@@ -406,6 +406,13 @@ app.get('/api/memberships', h(async (req, res) => res.json(await db.all('SELECT 
 app.get('/api/trainers', h(async (req, res) => res.json(await db.all('SELECT * FROM trainers ORDER BY id'))));
 app.get('/api/foods', h(async (req, res) => res.json(await db.all('SELECT * FROM foods ORDER BY id'))));
 app.get('/api/reviews', h(async (req, res) => res.json(await db.all('SELECT * FROM reviews ORDER BY id'))));
+// Public certification registry — list + single lookup by cert ID (used by QR codes).
+app.get('/api/certificates', h(async (req, res) => res.json(await db.all('SELECT * FROM certificates ORDER BY cert_date DESC, id DESC'))));
+app.get('/api/certificates/:certId', h(async (req, res) => {
+  const c = await db.get('SELECT * FROM certificates WHERE UPPER(cert_id) = UPPER($1)', [req.params.certId]);
+  if (!c) return res.status(404).json({ error: 'Certificate not found.' });
+  res.json(c);
+}));
 // Auto-set event status from its date (IST): future=upcoming, today=ongoing, past=past.
 // Only touches rows with a valid YYYY-MM-DD date; undated events keep their manual status.
 async function reconcileEventStatuses() {
@@ -600,9 +607,24 @@ app.get('/api/admin/summary', requireAdmin, h(async (req, res) => {
 }));
 
 // Generic image upload (events, etc.) -> returns a public URL
+// Auto-compress admin image uploads (keeps Supabase Storage small). Requires `npm install sharp`;
+// if sharp isn't installed, images upload unchanged.
+let sharp = null; try { sharp = require('sharp'); } catch (e) { console.log('[upload] sharp not installed — images will be stored uncompressed.'); }
+async function compressImage(file) {
+  if (!sharp || !file || !/^image\//.test(file.mimetype || '') || /gif|svg/.test(file.mimetype || '')) return file;
+  try {
+    const buf = await sharp(file.buffer).rotate()
+      .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 78, mozjpeg: true }).toBuffer();
+    if (buf.length < file.buffer.length) {
+      return { buffer: buf, mimetype: 'image/jpeg', originalname: String(file.originalname || 'image').replace(/\.[^.]+$/, '') + '.jpg' };
+    }
+  } catch (e) { console.error('[upload] compress failed, storing original:', e.message); }
+  return file;
+}
 app.post('/api/admin/upload-image', requireAdmin, upload.single('image'), h(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image provided.' });
-  const url = await storeFile(req.file, 'image.jpg');
+  const url = await storeFile(await compressImage(req.file), 'image.jpg');
   res.json({ ok: true, url });
 }));
 app.get('/api/admin/events', requireAdmin, h(async (req, res) => { await reconcileEventStatuses(); res.json(await db.all('SELECT * FROM events ORDER BY event_date')); }));
@@ -624,6 +646,34 @@ app.patch('/api/admin/events/:id', requireAdmin, h(async (req, res) => {
 }));
 app.delete('/api/admin/events/:id', requireAdmin, h(async (req, res) => {
   await db.run('DELETE FROM events WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}));
+
+// ---- Certificates (admin) ----
+app.get('/api/admin/certificates', requireAdmin, h(async (req, res) => res.json(await db.all('SELECT * FROM certificates ORDER BY created_at DESC'))));
+app.post('/api/admin/certificates', requireAdmin, h(async (req, res) => {
+  const { cert_id, name, course, cert_date, image, photo } = req.body || {};
+  if (!name || !cert_id) return res.status(400).json({ error: 'Name and certificate ID are required.' });
+  const dup = await db.get('SELECT id FROM certificates WHERE UPPER(cert_id) = UPPER($1)', [cert_id.trim()]);
+  if (dup) return res.status(409).json({ error: 'That certificate ID already exists.' });
+  const row = await db.get('INSERT INTO certificates (cert_id,name,course,cert_date,image,photo) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
+    [cert_id.trim(), name, course || '', cert_date || '', image || '', photo || '']);
+  res.json({ ok: true, id: row.id });
+}));
+app.patch('/api/admin/certificates/:id', requireAdmin, h(async (req, res) => {
+  const { cert_id, name, course, cert_date, image, photo } = req.body || {};
+  const c = await db.get('SELECT * FROM certificates WHERE id = $1', [req.params.id]);
+  if (!c) return res.status(404).json({ error: 'Not found.' });
+  if (cert_id && cert_id.trim().toUpperCase() !== String(c.cert_id).toUpperCase()) {
+    const dup = await db.get('SELECT id FROM certificates WHERE UPPER(cert_id) = UPPER($1) AND id <> $2', [cert_id.trim(), req.params.id]);
+    if (dup) return res.status(409).json({ error: 'That certificate ID already exists.' });
+  }
+  await db.run('UPDATE certificates SET cert_id=$1, name=$2, course=$3, cert_date=$4, image=$5, photo=$6 WHERE id=$7',
+    [(cert_id || c.cert_id).trim(), name ?? c.name, course ?? c.course, cert_date ?? c.cert_date, image ?? c.image, photo ?? c.photo, req.params.id]);
+  res.json({ ok: true });
+}));
+app.delete('/api/admin/certificates/:id', requireAdmin, h(async (req, res) => {
+  await db.run('DELETE FROM certificates WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
 }));
 
