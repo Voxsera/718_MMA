@@ -6,7 +6,7 @@
   const SESSIONS = ['Session 1 · 6:30–8:00 AM', 'Session 2 · 8:00–9:30 AM', 'Session 3 · 6:30–8:00 PM', 'Session 4 · 8:00–9:30 PM'];
   const sessionOptions = () => SESSIONS.map((s) => [s, s]);
   const api = {
-    async get(u) { const r = await fetch(u); if (r.status === 401) { show(false); return null; } return r.json(); },
+    async get(u) { const r = await fetch(u, { cache: 'no-store' }); if (r.status === 401) { show(false); return null; } return r.json(); },
     async send(u, m, b) { const r = await fetch(u, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); return r.json(); },
   };
   let ROLE = 'owner';

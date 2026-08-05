@@ -871,6 +871,18 @@ app.patch('/api/admin/members/:id', requireOwner, h(async (req, res) => {
      amount=$7, paid_amount=$8, pending_amount=$9, cash_amount=$10, online_amount=$11, starts_at=$12, expires_at=$13, method=$14
      WHERE id=$15`,
     [name, email, phone, plan, session, membershipId, amount, paid, pending, cash, online, starts, expires, note, req.params.id]);
+  // If the money figures were changed, this is a correction — reconcile the billing ledger so the
+  // Details totals match exactly what was typed (replace the old entries, don't stack on top of them).
+  const moneyChanged = amount !== (m.amount || 0) || paid !== (m.paid_amount || 0) || pending !== (m.pending_amount || 0)
+    || cash !== (m.cash_amount || 0) || online !== (m.online_amount || 0);
+  if (moneyChanged) {
+    await db.run(`DELETE FROM payments WHERE status='paid' AND (
+        (COALESCE(membership_id,'') <> '' AND membership_id = $1)
+        OR (COALESCE($2,'') <> '' AND email = $2))`,
+      [membershipId || '', email || '']);
+    await db.run("INSERT INTO payments (name,email,phone,plan,amount,status,method,session,membership_id,note,bill_amount,due_amount,created_at) VALUES ($1,$2,$3,$4,$5,'paid',$6,$7,$8,$9,$10,$11,$12)",
+      [name || '', email || '', phone || '', plan, paid, note, session || null, membershipId || null, 'Corrected (edit)', amount, pending, starts]);
+  }
   res.json({ ok: true });
 }));
 // Full member detail + transaction history (with timestamps). Powers the "Details" button.
