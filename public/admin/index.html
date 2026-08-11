@@ -37,7 +37,8 @@
       <a data-v="collabs" title="Collaborations"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Collaborations</span></a>
       <a data-v="payments" title="Payments"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg><span>Payments</span></a>
       <a data-v="members" title="Members"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Members</span></a>
-      <a data-v="collections" title="Collections"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg><span>Collections</span></a>
+       <a data-v="collections" title="Collections"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg><span>Collections</span></a>
+      <a data-v="reports" title="Reports"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16"/><path d="m7 15 4-4 3 2 5-6"/></svg><span>Reports</span></a>
       <a data-v="closure" title="Gym Closure"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M14 14l-4 4M10 14l4 4"/></svg><span>Gym Closure</span></a>
       <a data-v="classes" title="Classes"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Classes</span></a>
       <a data-v="videos" title="Videos"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="14" height="16" rx="2"/><path d="m22 8-6 4 6 4V8Z"/></svg><span>Videos</span></a>
@@ -85,7 +86,8 @@
       <section class="view" id="v-members">
         <div class="members-toolbar">
           <div class="tb-actions">
-            <button class="tb-btn primary" id="add-member">＋ Add Member</button>
+            <button class="tb-btn primary" id="new-admission">＋ New Admissions</button>
+            <button class="tb-btn" id="start-renewal">↻ Renewals</button>
             <button class="tb-btn" id="import-toggle">⇪ Import Excel</button>
           </div>
           <div class="search-wrap">
@@ -113,6 +115,20 @@
         </div>
         <div class="seg">Today's Payments</div>
         <div id="coll-table"></div>
+      </section>
+      <section class="view" id="v-reports">
+        <p class="hint" style="margin-bottom:14px">Track collections, admissions, renewals, outstanding balances, and day-to-day expenses. Download the selected period as a PDF or Excel workbook.</p>
+        <div class="reports-toolbar">
+          <select id="report-period" class="mini"><option value="month">Current Month</option><option value="year">Current Financial Year</option><option value="all">All Time</option></select>
+          <button class="tb-btn primary" id="add-expense">＋ Add Daily Expense</button>
+          <button class="tb-btn" id="export-report-pdf">↓ Download PDF</button>
+          <button class="tb-btn" id="export-report-xlsx">↓ Download Excel</button>
+        </div>
+        <div class="cards" id="report-cards"></div>
+        <div class="seg">Daily expenses</div>
+        <div id="report-expenses"></div>
+        <div class="seg">Collections</div>
+        <div id="report-payments"></div>
       </section>
       <section class="view" id="v-closure">
         <p class="hint" style="margin-bottom:14px">Set the gym closed for a day. When the date is <b style="color:#fff">today</b>, a banner shows on the website hero and members get an in-app notice. Clear the date to reopen.</p>

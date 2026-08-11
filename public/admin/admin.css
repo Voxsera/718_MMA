@@ -66,6 +66,15 @@ button.mini:hover{border-color:var(--red);color:var(--red)}
 .members-toolbar .tb-btn.primary{background:var(--red);border-color:var(--red);color:#fff}
 .members-toolbar .tb-btn.primary:hover{background:var(--red-bright);color:#fff}
 .members-toolbar .search-wrap{margin-left:auto}
+.reports-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+.reports-toolbar .tb-btn{display:inline-flex;align-items:center;gap:8px;font-family:var(--cond);letter-spacing:1.5px;text-transform:uppercase;font-size:13px;font-weight:700;padding:11px 18px;border-radius:8px;cursor:pointer;border:1px solid var(--line);background:var(--ink);color:#fff;transition:.15s}
+.reports-toolbar .tb-btn:hover{border-color:var(--red);color:var(--red)}.reports-toolbar .tb-btn.primary{background:var(--red);border-color:var(--red)}.reports-toolbar .tb-btn.primary:hover{background:var(--red-bright);color:#fff}
+.renewal-picker .search-wrap{max-width:none;margin:4px 0 12px}
+.renewal-results{max-height:320px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;background:var(--ink);margin-top:10px}
+.renewal-result{display:block;width:100%;text-align:left;padding:12px 14px;border:0;border-bottom:1px solid var(--line);background:transparent;color:#fff;cursor:pointer;font-family:var(--body)}
+.renewal-result:last-child{border-bottom:0}.renewal-result:hover,.renewal-result.selected{background:rgba(232,17,45,.12)}
+.renewal-result.selected{box-shadow:inset 3px 0 0 var(--red)}
+.renewal-result b,.renewal-result span,.renewal-result small{display:block}.renewal-result span,.renewal-result small{color:var(--grey);font-size:12px;margin-top:3px}
 .member-count-pill{font-family:var(--cond);letter-spacing:1px;text-transform:uppercase;font-size:12px;color:var(--grey);border:1px solid var(--line);border-radius:20px;padding:6px 14px;white-space:nowrap}
 .status-pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--cond);letter-spacing:.5px;text-transform:uppercase;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
 .status-pill.active{background:rgba(62,207,142,.12);color:#3ecf8e}
