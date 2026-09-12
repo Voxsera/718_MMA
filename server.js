@@ -403,6 +403,15 @@ async function getSetting(key) { const r = await db.get('SELECT value FROM app_s
 async function setSetting(key, value) {
   await db.run('INSERT INTO app_settings (key,value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=$2', [key, value]);
 }
+async function membershipFeeSettings() {
+  const [enabledValue, amountValue] = await Promise.all([
+    getSetting('membership_fee_enabled'), getSetting('membership_fee_amount'),
+  ]);
+  return {
+    enabled: enabledValue === null ? true : enabledValue === 'true',
+    amount: Math.max(0, parseInt(amountValue === null ? '1000' : amountValue, 10) || 0),
+  };
+}
 
 function reportPeriod(period) {
   if (period === 'year') return { key: 'year', label: 'Current financial year', paymentWhere: "(created_at AT TIME ZONE 'Asia/Kolkata') >= make_date(CASE WHEN EXTRACT(MONTH FROM now() AT TIME ZONE 'Asia/Kolkata') >= 4 THEN EXTRACT(YEAR FROM now() AT TIME ZONE 'Asia/Kolkata')::int ELSE EXTRACT(YEAR FROM now() AT TIME ZONE 'Asia/Kolkata')::int - 1 END, 4, 1)", expenseWhere: "expense_date >= make_date(CASE WHEN EXTRACT(MONTH FROM now() AT TIME ZONE 'Asia/Kolkata') >= 4 THEN EXTRACT(YEAR FROM now() AT TIME ZONE 'Asia/Kolkata')::int ELSE EXTRACT(YEAR FROM now() AT TIME ZONE 'Asia/Kolkata')::int - 1 END, 4, 1)" };
@@ -773,7 +782,10 @@ app.post('/api/admin/members', requireAdmin, h(async (req, res) => {
   const phone = (b.phone || '').trim();
   const plan = b.plan || 'Membership';
   const session = b.session || null;
-  const total = parseInt(b.amount, 10) || 0;
+  const packageAmount = Math.max(0, parseInt(b.amount, 10) || 0);
+  const feeSettings = await membershipFeeSettings();
+  const membershipFee = feeSettings.enabled ? feeSettings.amount : 0;
+  const total = packageAmount + membershipFee;
   const cash = parseInt(b.cashAmount, 10) || 0;
   const online = parseInt(b.onlineAmount, 10) || 0;
   const discount = parseInt(b.discount, 10) || 0;
@@ -790,14 +802,14 @@ app.post('/api/admin/members', requireAdmin, h(async (req, res) => {
   if (!memberId) memberId = await nextMemberId();
   const note = paymentModeNote(cash, online, pending);
   await db.run(`INSERT INTO user_memberships
-     (email, name, phone, plan, amount, paid_amount, pending_amount, cash_amount, online_amount, discount, discount_note, starts_at, expires_at, session, membership_id, method)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
-    [email, name, phone, plan, total, paid, pending, cash, online, discount, discountNote || null, startISO, expISO, session, memberId, note]);
+      (email, name, phone, plan, amount, paid_amount, pending_amount, cash_amount, online_amount, discount, discount_note, membership_fee, starts_at, expires_at, session, membership_id, method)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+     [email, name, phone, plan, total, paid, pending, cash, online, discount, discountNote || null, membershipFee, startISO, expISO, session, memberId, note]);
   const pay = await db.get(`INSERT INTO payments (name,email,phone,plan,amount,status,method,session,membership_id,note,bill_amount,due_amount,created_at) VALUES ($1,$2,$3,$4,$5,'paid',$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
     [name, email, phone, plan, paid, note, session, memberId, discountNote ? ('New membership · ' + discountNote) : 'New membership', total, pending, startISO]);
   let invoiceNo = null;
   if (email) { const inv = await issueInvoice(pay, expISO); invoiceNo = inv.invoiceNo; } // invoice only if we have an email
-  res.json({ ok: true, memberId, expires: expISO, pending, invoiceNo, emailed: !!email && mailerReady });
+  res.json({ ok: true, memberId, expires: expISO, pending, invoiceNo, packageAmount, membershipFee, total, emailed: !!email && mailerReady });
 }));
 // Clear a member's pending (due) balance when they pay the rest later.
 app.post('/api/admin/members/:id/clear-pending', requireAdmin, h(async (req, res) => {
@@ -1137,6 +1149,16 @@ app.post('/api/worldline/webhook', h(async (req, res) => {
 }));
 
 app.get('/api/admin/memberships', requireAdmin, h(async (req, res) => res.json(await db.all('SELECT * FROM memberships ORDER BY sort'))));
+app.get('/api/admin/membership-fee', requireAdmin, h(async (req, res) => res.json(await membershipFeeSettings())));
+app.patch('/api/admin/membership-fee', requireOwner, h(async (req, res) => {
+  const enabled = !!(req.body && req.body.enabled);
+  const amount = Math.max(0, parseInt(req.body && req.body.amount, 10) || 0);
+  await Promise.all([
+    setSetting('membership_fee_enabled', String(enabled)),
+    setSetting('membership_fee_amount', String(amount || 1000)),
+  ]);
+  res.json({ ok: true, enabled, amount: amount || 1000 });
+}));
 app.patch('/api/admin/memberships/:id', requireOwner, h(async (req, res) => {
   const { price, name, duration, type } = req.body || {};
   const m = await db.get('SELECT * FROM memberships WHERE id = $1', [req.params.id]);

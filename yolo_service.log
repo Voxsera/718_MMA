@@ -1,0 +1,4 @@
+2026-09-12 17:46:10,848 - mcp.server.fastmcp.tools.tool_manager - WARNING - Tool already exists: list_available_models
+2026-09-12 17:46:10,854 - yolo_service - INFO - Starting YOLO MCP service
+2026-09-12 17:46:10,856 - yolo_service - INFO - Camera watchdog thread started
+2026-09-12 17:46:10,872 - mcp.server.lowlevel.server - INFO - Processing request of type ListToolsRequest

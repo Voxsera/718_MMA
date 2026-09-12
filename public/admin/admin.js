@@ -28,6 +28,8 @@
       const btn = document.getElementById(id);
       if (btn) btn.style.display = ROLE === 'coach' ? 'none' : '';
     });
+    const feeBtn = document.getElementById('membership-fee-settings');
+    if (feeBtn) feeBtn.style.display = ROLE === 'owner' ? '' : 'none';
     // Excel import is owner-only.
     const impToggle = document.getElementById('import-toggle');
     if (impToggle) impToggle.style.display = ROLE === 'owner' ? '' : 'none';
@@ -493,7 +495,8 @@
     if (sb) sb.addEventListener('keydown', (e) => { if (e.key === 'Escape') { sb.value = ''; if (wrap) wrap.classList.remove('has-text'); renderMembers(); } });
     if (cl) cl.addEventListener('click', () => { sb.value = ''; if (wrap) wrap.classList.remove('has-text'); renderMembers(); sb.focus(); }); }
   $('#new-admission').addEventListener('click', async () => {
-    const plans = await getPlans();
+    const [plans, fee] = await Promise.all([getPlans(), api.get('/api/admin/membership-fee')]);
+    const membershipFee = fee && fee.enabled ? Number(fee.amount || 0) : 0;
     const priceOf = (name) => { const p = plans.find((x) => x.name === name); return p ? p.price : 0; };
     const d = await openForm('New Admission', [
       { key: 'name', label: 'Member name' },
@@ -511,6 +514,9 @@
     ], (body) => {
       const q = (k) => body.querySelector(`[data-k="${k}"]`);
       const planSel = q('plan'), dType = q('discountType'), dVal = q('discountValue'), amt = q('amount');
+      const feeInfo = document.createElement('p');
+      feeInfo.className = 'hint'; feeInfo.style.cssText = 'margin:4px 0 12px;line-height:1.6';
+      amt.parentElement.insertBefore(feeInfo, amt.nextSibling);
       let overridden = false;
       amt.addEventListener('input', () => { overridden = true; });
       const recompute = () => {
@@ -521,6 +527,7 @@
         if (v > 0 && dType.value === 'percent') disc = Math.round(price * v / 100);
         else if (v > 0 && dType.value === 'amount') disc = v;
         amt.value = Math.max(0, price - disc);
+        feeInfo.innerHTML = membershipFee ? `One-time membership fee: <b style="color:#fff">${inr(membershipFee)}</b><br>Total for this new admission: <b style="color:var(--red)">${inr((parseInt(amt.value, 10) || 0) + membershipFee)}</b>` : 'Membership fee is currently turned off.';
       };
       [planSel, dType, dVal].forEach((el) => { el.addEventListener('input', recompute); el.addEventListener('change', recompute); });
       recompute();
@@ -534,9 +541,10 @@
     if (dv > 0 && d.discountType === 'percent') { discount = Math.round(listPrice * dv / 100); discountNote = `${dv}% off (−${inr(discount)})`; }
     else if (dv > 0 && d.discountType === 'amount') { discount = dv; discountNote = `${inr(dv)} off`; }
     // --- total ---
-    let total = parseInt(d.amount, 10) || 0;
-    if (!total) total = Math.max(0, listPrice - discount);
-    d.amount = total; d.discount = discount; d.discountNote = discountNote;
+    let packageTotal = parseInt(d.amount, 10) || 0;
+    if (!packageTotal) packageTotal = Math.max(0, listPrice - discount);
+    d.amount = packageTotal; d.discount = discount; d.discountNote = discountNote;
+    const total = packageTotal + membershipFee;
     d.date = stampFor(d.date);
     // --- payment split: if nothing entered, assume paid in full (cash) — never silently "all pending" ---
     let cash = parseInt(d.cashAmount, 10) || 0;
@@ -559,6 +567,17 @@
       await notifyModal('Member added', `Membership No <b style="color:#fff">${r.memberId}</b>.${r.invoiceNo ? ` Invoice ${r.invoiceNo}${r.emailed ? ' emailed' : ''}.` : ''}${discMsg}${pendMsg}`);
     } else await notifyModal('Failed', r.error || 'Could not add the member.');
     loadMembers();
+  });
+  $('#membership-fee-settings').addEventListener('click', async () => {
+    const fee = await api.get('/api/admin/membership-fee'); if (!fee) return;
+    const d = await openForm('One-Time Membership Fee', [
+      { key: 'amount', label: 'Fee amount (rupees)', type: 'number', value: fee.amount || 1000 },
+      { key: 'enabled', label: 'Charge this fee on every new admission', type: 'checkbox', value: fee.enabled },
+    ]);
+    if (!d) return;
+    const r = await api.send('/api/admin/membership-fee', 'PATCH', { amount: d.amount, enabled: d.enabled });
+    if (r.ok) await notifyModal('Membership fee updated', r.enabled ? `New admissions will include a one-time ${inr(r.amount)} membership fee.` : 'The one-time membership fee is now turned off.');
+    else await notifyModal('Failed', r.error || 'Could not update the membership fee.');
   });
   $('#start-renewal').addEventListener('click', async () => {
     if (!_members.length) await loadMembers();

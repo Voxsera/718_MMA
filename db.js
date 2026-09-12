@@ -144,6 +144,8 @@ async function init() {
   await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS cash_amount INTEGER DEFAULT 0`);
   await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS online_amount INTEGER DEFAULT 0`);
   await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS pending_cleared_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS membership_fee INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS membership_fee INTEGER NOT NULL DEFAULT 0`);
 }
 
 module.exports = { pool, all, get, run, init };
