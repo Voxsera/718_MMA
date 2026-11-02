@@ -12,6 +12,7 @@
     "seed": "node seed.js",
     "client": "npm --prefix client run dev",
     "build": "npm --prefix client install && npm --prefix client run build",
+    "migrate:invoices": "node migrate_invoice_numbers.js",
     "dev": "node server.js",
     "setup": "npm install && npm --prefix client install"
   },

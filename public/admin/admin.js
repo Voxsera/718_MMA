@@ -6,7 +6,7 @@
   const SESSIONS = ['Session 1 · 6:30–8:00 AM', 'Session 2 · 8:00–9:30 AM', 'Session 3 · 6:30–8:00 PM', 'Session 4 · 8:00–9:30 PM'];
   const sessionOptions = () => SESSIONS.map((s) => [s, s]);
   const api = {
-    async get(u) { const r = await fetch(u); if (r.status === 401) { show(false); return null; } return r.json(); },
+    async get(u) { const r = await fetch(u, { cache: 'no-store' }); if (r.status === 401) { show(false); return null; } return r.json(); },
     async send(u, m, b) { const r = await fetch(u, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined }); return r.json(); },
   };
   let ROLE = 'owner';
@@ -24,8 +24,12 @@
     const badgeEl = document.getElementById('role-badge');
     if (badgeEl) badgeEl.textContent = cfg ? cfg.label : 'OWNER';
     // Coach views members but can't add/renew (money actions).
-    const addMemberBtn = document.getElementById('add-member');
-    if (addMemberBtn) addMemberBtn.style.display = ROLE === 'coach' ? 'none' : '';
+    ['new-admission', 'start-renewal'].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.style.display = ROLE === 'coach' ? 'none' : '';
+    });
+    const feeBtn = document.getElementById('membership-fee-settings');
+    if (feeBtn) feeBtn.style.display = ROLE === 'owner' ? '' : 'none';
     // Excel import is owner-only.
     const impToggle = document.getElementById('import-toggle');
     if (impToggle) impToggle.style.display = ROLE === 'owner' ? '' : 'none';
@@ -93,7 +97,7 @@
     $('#v-' + v).classList.add('active');
     $('#title').textContent = a.textContent.replace(/[^\w\s]/g, '').trim();
     closeMenu(); // collapse drawer on mobile after picking a section
-    ({ dash: loadDash, events: loadEvents, certs: loadCerts, trials: loadTrials, collabs: loadCollabs, payments: loadPayments, members: loadMembers, collections: loadCollections, closure: loadClosure, classes: loadClasses, videos: loadVideos, diet: loadDiet, memberships: loadPlans }[v])();
+    ({ dash: loadDash, events: loadEvents, certs: loadCerts, trials: loadTrials, collabs: loadCollabs, payments: loadPayments, members: loadMembers, collections: loadCollections, reports: loadReports, closure: loadClosure, classes: loadClasses, videos: loadVideos, diet: loadDiet, memberships: loadPlans }[v])();
   }));
 
   const tbl = (cols, rows) => `<table><thead><tr>${cols.map((c) => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>`;
@@ -490,10 +494,11 @@
     if (sb) sb.addEventListener('input', () => { if (wrap) wrap.classList.toggle('has-text', !!sb.value); renderMembers(); });
     if (sb) sb.addEventListener('keydown', (e) => { if (e.key === 'Escape') { sb.value = ''; if (wrap) wrap.classList.remove('has-text'); renderMembers(); } });
     if (cl) cl.addEventListener('click', () => { sb.value = ''; if (wrap) wrap.classList.remove('has-text'); renderMembers(); sb.focus(); }); }
-  $('#add-member').addEventListener('click', async () => {
-    const plans = await getPlans();
+  $('#new-admission').addEventListener('click', async () => {
+    const [plans, fee] = await Promise.all([getPlans(), api.get('/api/admin/membership-fee')]);
+    const membershipFee = fee && fee.enabled ? Number(fee.amount || 0) : 0;
     const priceOf = (name) => { const p = plans.find((x) => x.name === name); return p ? p.price : 0; };
-    const d = await openForm('Add Member', [
+    const d = await openForm('New Admission', [
       { key: 'name', label: 'Member name' },
       { key: 'membershipId', label: 'Membership No (blank = auto, e.g. 718MMA…)' },
       { key: 'email', label: 'Email (optional — needed for reminders/invoice)' },
@@ -509,6 +514,9 @@
     ], (body) => {
       const q = (k) => body.querySelector(`[data-k="${k}"]`);
       const planSel = q('plan'), dType = q('discountType'), dVal = q('discountValue'), amt = q('amount');
+      const feeInfo = document.createElement('p');
+      feeInfo.className = 'hint'; feeInfo.style.cssText = 'margin:4px 0 12px;line-height:1.6';
+      amt.parentElement.insertBefore(feeInfo, amt.nextSibling);
       let overridden = false;
       amt.addEventListener('input', () => { overridden = true; });
       const recompute = () => {
@@ -519,6 +527,7 @@
         if (v > 0 && dType.value === 'percent') disc = Math.round(price * v / 100);
         else if (v > 0 && dType.value === 'amount') disc = v;
         amt.value = Math.max(0, price - disc);
+        feeInfo.innerHTML = membershipFee ? `One-time membership fee: <b style="color:#fff">${inr(membershipFee)}</b><br>Total for this new admission: <b style="color:var(--red)">${inr((parseInt(amt.value, 10) || 0) + membershipFee)}</b>` : 'Membership fee is currently turned off.';
       };
       [planSel, dType, dVal].forEach((el) => { el.addEventListener('input', recompute); el.addEventListener('change', recompute); });
       recompute();
@@ -532,9 +541,10 @@
     if (dv > 0 && d.discountType === 'percent') { discount = Math.round(listPrice * dv / 100); discountNote = `${dv}% off (−${inr(discount)})`; }
     else if (dv > 0 && d.discountType === 'amount') { discount = dv; discountNote = `${inr(dv)} off`; }
     // --- total ---
-    let total = parseInt(d.amount, 10) || 0;
-    if (!total) total = Math.max(0, listPrice - discount);
-    d.amount = total; d.discount = discount; d.discountNote = discountNote;
+    let packageTotal = parseInt(d.amount, 10) || 0;
+    if (!packageTotal) packageTotal = Math.max(0, listPrice - discount);
+    d.amount = packageTotal; d.discount = discount; d.discountNote = discountNote;
+    const total = packageTotal + membershipFee;
     d.date = stampFor(d.date);
     // --- payment split: if nothing entered, assume paid in full (cash) — never silently "all pending" ---
     let cash = parseInt(d.cashAmount, 10) || 0;
@@ -558,6 +568,63 @@
     } else await notifyModal('Failed', r.error || 'Could not add the member.');
     loadMembers();
   });
+  $('#membership-fee-settings').addEventListener('click', async () => {
+    const fee = await api.get('/api/admin/membership-fee'); if (!fee) return;
+    const d = await openForm('One-Time Membership Fee', [
+      { key: 'amount', label: 'Fee amount (rupees)', type: 'number', value: fee.amount || 1000 },
+      { key: 'enabled', label: 'Charge this fee on every new admission', type: 'checkbox', value: fee.enabled },
+    ]);
+    if (!d) return;
+    const r = await api.send('/api/admin/membership-fee', 'PATCH', { amount: d.amount, enabled: d.enabled });
+    if (r.ok) await notifyModal('Membership fee updated', r.enabled ? `New admissions will include a one-time ${inr(r.amount)} membership fee.` : 'The one-time membership fee is now turned off.');
+    else await notifyModal('Failed', r.error || 'Could not update the membership fee.');
+  });
+  $('#start-renewal').addEventListener('click', async () => {
+    if (!_members.length) await loadMembers();
+    if (!_members.length) { await notifyModal('No members yet', 'Add a new admission before recording a renewal.'); return; }
+    const memberId = await openRenewalPicker();
+    if (memberId) await renewMember(memberId);
+  });
+  function openRenewalPicker() {
+    return new Promise((resolve) => {
+      const overlay = $('#modal');
+      const body = $('#modal-body');
+      let selected = null;
+      $('#modal-title').textContent = 'Select Member For Renewal';
+      body.innerHTML = `<div class="renewal-picker">
+        <div class="search-wrap"><svg class="search-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg><input id="renewal-member-search" type="text" placeholder="Search members by name, ID, email, mobile or package" autocomplete="off" spellcheck="false" /></div>
+        <p class="hint" id="renewal-picker-note">Choose the member whose membership you want to renew.</p>
+        <div class="renewal-results" id="renewal-results"></div>
+      </div>`;
+      const input = $('#renewal-member-search');
+      const results = $('#renewal-results');
+      const note = $('#renewal-picker-note');
+      const esc = (v) => String(v || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      const render = () => {
+        const q = input.value.trim().toLowerCase();
+        const list = _members.filter((m) => !q || [m.name, m.membership_id, m.email, m.phone, m.plan].some((f) => String(f || '').toLowerCase().includes(q)));
+        results.innerHTML = list.length ? list.map((m) => `<button type="button" class="renewal-result${selected === m.id ? ' selected' : ''}" data-member-id="${m.id}"><b>${esc(m.name || 'Unnamed member')}</b><span>${esc(m.membership_id || 'No membership ID')} · ${esc(m.plan || 'No package')} · expires ${dstr(m.expires_at)}</span><small>${esc(m.email || m.phone || '')}</small></button>`).join('') : '<p class="hint" style="padding:12px">No members match your search.</p>';
+      };
+      const close = (value) => {
+        overlay.classList.remove('open'); $('#modal-save').onclick = null; $('#modal-cancel').onclick = null; overlay.onclick = null;
+        $('#modal-save').textContent = 'Save'; resolve(value);
+      };
+      results.addEventListener('click', (e) => {
+        const button = e.target.closest('[data-member-id]');
+        if (!button) return;
+        selected = Number(button.dataset.memberId);
+        const member = _members.find((m) => m.id === selected);
+        note.textContent = member ? `Selected: ${member.name || 'Unnamed member'} (${member.membership_id || 'No ID'}).` : '';
+        render();
+      });
+      input.addEventListener('input', render);
+      $('#modal-save').textContent = 'Continue';
+      $('#modal-save').onclick = () => { if (!selected) { note.textContent = 'Choose a member from the search results to continue.'; return; } close(selected); };
+      $('#modal-cancel').onclick = () => close(null);
+      overlay.onclick = (e) => { if (e.target === overlay) close(null); };
+      render(); overlay.classList.add('open'); setTimeout(() => input.focus(), 50);
+    });
+  }
   async function clearPending(id) {
     const m = _members.find((x) => x.id === id);
     const due = m ? (m.pending_amount || 0) : 0;
@@ -809,6 +876,46 @@
   }
   { const hb = document.getElementById('handover-btn'); if (hb) hb.addEventListener('click', doHandover); }
 
+  // ---- Financial reports & daily expenses (owner only) ----
+  async function loadReports() {
+    const period = ($('#report-period') || {}).value || 'month';
+    const r = await api.get('/api/admin/reports?period=' + encodeURIComponent(period));
+    if (!r || r.error) return;
+    const s = r.summary || {};
+    $('#report-cards').innerHTML = [
+      ['Collections', inr(s.collections), 'paid payments'], ['Expenses', inr(s.expenses), 'recorded expenses'],
+      ['Net Collections', inr(s.netCollections), r.label], ['New Admissions', s.admissions || 0, 'members started'],
+      ['Renewals', s.renewals || 0, 'renewal payments'], ['Outstanding Due', inr(s.outstanding), 'current member balances'],
+    ].map(([value, amount, note], i) => `<div class="stat-card" style="border-top-color:${i === 2 ? '#3ecf8e' : (i === 1 || i === 5 ? 'var(--red)' : '')}"><b>${amount}</b><span>${value}</span><div class="hint" style="margin-top:6px">${note}</div></div>`).join('');
+    const expenses = (r.expenses || []).map((e) => `<tr><td>${dstr(e.expense_date)}</td><td><b style="color:#fff">${e.category || 'General'}</b></td><td>${e.description || '-'}</td><td>${inr(e.amount)}</td><td class="hint">${e.created_by || '-'}</td><td><button class="mini" onclick="ADMIN.delExpense(${e.id})">Delete</button></td></tr>`);
+    $('#report-expenses').innerHTML = expenses.length ? tbl(['Date', 'Category', 'Description', 'Amount', 'Added by', ''], expenses) : '<p class="hint">No expenses recorded for this period.</p>';
+    const payments = (r.payments || []).map((p) => `<tr><td>${dstr(p.created_at)}</td><td><b style="color:#fff">${p.name || '-'}</b><br><span class="hint">${p.email || ''}</span></td><td>${p.plan || '-'}</td><td>${p.method || '-'}</td><td>${inr(p.amount)}</td></tr>`);
+    $('#report-payments').innerHTML = payments.length ? tbl(['Date', 'Member', 'Plan', 'Method', 'Amount'], payments) : '<p class="hint">No paid collections for this period.</p>';
+  }
+  async function addExpense() {
+    const d = await openForm('Add Daily Expense', [
+      { key: 'expense_date', label: 'Expense date', type: 'date', value: today() },
+      { key: 'category', label: 'Category', type: 'select', value: 'General', options: [['General','General'],['Rent','Rent'],['Utilities','Utilities'],['Equipment','Equipment'],['Maintenance','Maintenance'],['Marketing','Marketing'],['Staff','Staff'],['Supplies','Supplies'],['Other','Other']] },
+      { key: 'description', label: 'Description (optional)', placeholder: 'e.g. Cleaning supplies' },
+      { key: 'amount', label: 'Amount (₹)', type: 'number' },
+    ]);
+    if (!d) return;
+    const r = await api.send('/api/admin/expenses', 'POST', d);
+    if (!r.ok) await notifyModal('Failed', r.error || 'Could not add the expense.');
+    else await loadReports();
+  }
+  async function delExpense(id) {
+    const ok = await confirmModal('Delete expense', 'Delete this expense entry? This cannot be undone.', 'Delete');
+    if (!ok) return;
+    const r = await api.send('/api/admin/expenses/' + id, 'DELETE');
+    if (!r.ok) await notifyModal('Failed', r.error || 'Could not delete the expense.');
+    else await loadReports();
+  }
+  { const el = $('#report-period'); if (el) el.addEventListener('change', loadReports); }
+  { const el = $('#add-expense'); if (el) el.addEventListener('click', addExpense); }
+  { const el = $('#export-report-pdf'); if (el) el.addEventListener('click', () => window.open('/api/admin/reports/export/pdf?period=' + encodeURIComponent($('#report-period').value), '_blank')); }
+  { const el = $('#export-report-xlsx'); if (el) el.addEventListener('click', () => window.open('/api/admin/reports/export/xlsx?period=' + encodeURIComponent($('#report-period').value), '_blank')); }
+
   let _plans = [];
   async function loadPlans() {
     _plans = (await api.get('/api/admin/memberships') || []);
@@ -921,7 +1028,7 @@
     else { out.className = 'form-msg err'; out.textContent = '⚠️ ' + (j.error || 'Upload failed.'); }
   }
 
-  window.ADMIN = { setEventStatus, editEvent, delEvent, editCert, delCert, setTrial, delTrial, setCollab, delCollab, editPlan, renewMember, editMember, showDetails, delMember, delPayment, clearPending, importMembers, saveClosure, clearClosure, delClass, delVideo, delDiet, uploadDiet, uploadVideoFile };
+  window.ADMIN = { setEventStatus, editEvent, delEvent, editCert, delCert, setTrial, delTrial, setCollab, delCollab, editPlan, renewMember, editMember, showDetails, delMember, delPayment, clearPending, importMembers, delExpense, saveClosure, clearClosure, delClass, delVideo, delDiet, uploadDiet, uploadVideoFile };
   initLogin();
   checkAuth();
 })();

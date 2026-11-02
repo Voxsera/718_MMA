@@ -2,9 +2,9 @@
 // Find it on Windows with `ipconfig` (IPv4 Address), e.g. 192.168.1.5
 // Phone and PC must be on the SAME Wi-Fi. Do NOT use "localhost" (that's the phone itself).
 // export const API_URL = 'http://172.19.80.1:3000';
-export const API_URL = 'http://10.41.83.175:3000';
+export const API_URL = 'https://718mma.in';
 // Renew/membership opens this site in the browser (Razorpay web checkout). Usually same as API_URL.
-export const WEBSITE_URL = API_URL;
+export const WEBSITE_URL = 'https://718mma.in';
 
 // Optional — Google sign-in inside the app. Create OAuth client IDs in Google Cloud Console.
 // Leave blank to hide the Google button (email/password still works).

@@ -63,7 +63,7 @@ function generateInvoicePdf(data = {}) {
       // GST is inclusive of the amount paid.
       const total = Number(data.amount || 0);
       const rate = data.gstRate != null ? data.gstRate : 5;
-      const gst = data.gst != null ? Number(data.gst) : Math.round(total * rate / 100);
+  const gst = data.gst != null ? Number(data.gst) : Math.round(total * rate / (100 + rate));
       const base = data.base != null ? Number(data.base) : total - gst;
 
       // ---- Table ----

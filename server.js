@@ -15,9 +15,11 @@ const { OAuth2Client } = require('google-auth-library');
 const db = require('./db');
 const multer = require('multer');
 const { generateInvoicePdf } = require('./invoice');
+const { generateReportPdf } = require('./reports');
 const { sendInvoiceEmail, sendRenewalEmail, mailerReady } = require('./mailer');
 const worldline = require('./worldline');
 const wa = require('./whatsapp');
+const XLSX = require('xlsx');
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 
 // Supabase Storage (for diet screenshots / videos)
@@ -244,18 +246,36 @@ async function backfillMemberIds() {
 }
 
 // ----- Invoicing -----
-function invoiceNoFor(id) {
-  return `INV-${new Date().getFullYear()}-${String(id).padStart(4, '0')}`;
+// Indian financial year: 1 Apr–31 Mar, using Asia/Kolkata rather than server time.
+function invoiceFinancialYear(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Kolkata', year: 'numeric', month: 'numeric',
+  }).formatToParts(now);
+  const value = (type) => Number(parts.find((p) => p.type === type).value);
+  const year = value('year');
+  const month = value('month');
+  const startYear = month >= 4 ? year : year - 1;
+  return `${String(startYear).slice(-2)}/${String(startYear + 1).slice(-2)}`;
+}
+// Atomically reserve the next number for the financial year, e.g. INV-26/27-001.
+async function nextInvoiceNo() {
+  const financialYear = invoiceFinancialYear();
+  const row = await db.get(`
+    INSERT INTO invoice_sequences (financial_year, last_number) VALUES ($1, 1)
+    ON CONFLICT (financial_year)
+    DO UPDATE SET last_number = invoice_sequences.last_number + 1
+    RETURNING last_number`, [financialYear]);
+  return `INV-${financialYear}-${String(row.last_number).padStart(3, '0')}`;
 }
 // Generate PDF + store on payment row + email it (best-effort, non-blocking).
 async function issueInvoice(payment, expiresAt) {
   if (!payment) return { invoiceNo: null };
-  const invoiceNo = payment.invoice_no || invoiceNoFor(payment.id);
-  // GST is inclusive: the paid amount already contains 5% GST.
+  const invoiceNo = payment.invoice_no || await nextInvoiceNo();
+  // GST is inclusive: extract it as rate / (100 + rate), not rate of the total.
   const GST_RATE = 5;
   const total = payment.amount || 0;
-  const gst = Math.round(total * GST_RATE / 100); // e.g. 10000 -> 500
-  const base = total - gst;                        // fees -> 9500
+  const gst = Math.round(total * GST_RATE / (100 + GST_RATE)); // e.g. 10,000 -> 476
+  const base = total - gst;                                  // fees -> 9,524
   const mrow = await db.get("SELECT membership_id FROM user_memberships WHERE email=$1 AND COALESCE(membership_id,'')<>'' ORDER BY created_at DESC LIMIT 1", [payment.email]);
   const data = {
     invoiceNo, memberId: mrow ? mrow.membership_id : '', name: payment.name, email: payment.email, phone: payment.phone,
@@ -382,6 +402,36 @@ function requireMember(req, res, next) {
 async function getSetting(key) { const r = await db.get('SELECT value FROM app_settings WHERE key=$1', [key]); return r ? r.value : null; }
 async function setSetting(key, value) {
   await db.run('INSERT INTO app_settings (key,value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=$2', [key, value]);
+}
+async function membershipFeeSettings() {
+  const [enabledValue, amountValue] = await Promise.all([
+    getSetting('membership_fee_enabled'), getSetting('membership_fee_amount'),
+  ]);
+  return {
+    enabled: enabledValue === null ? true : enabledValue === 'true',
+    amount: Math.max(0, parseInt(amountValue === null ? '1000' : amountValue, 10) || 0),
+  };
+}
+
+function reportPeriod(period) {
+  if (period === 'year') return { key: 'year', label: 'Current financial year', paymentWhere: "(created_at AT TIME ZONE 'Asia/Kolkata') >= make_date(CASE WHEN EXTRACT(MONTH FROM now() AT TIME ZONE 'Asia/Kolkata') >= 4 THEN EXTRACT(YEAR FROM now() AT TIME ZONE 'Asia/Kolkata')::int ELSE EXTRACT(YEAR FROM now() AT TIME ZONE 'Asia/Kolkata')::int - 1 END, 4, 1)", expenseWhere: "expense_date >= make_date(CASE WHEN EXTRACT(MONTH FROM now() AT TIME ZONE 'Asia/Kolkata') >= 4 THEN EXTRACT(YEAR FROM now() AT TIME ZONE 'Asia/Kolkata')::int ELSE EXTRACT(YEAR FROM now() AT TIME ZONE 'Asia/Kolkata')::int - 1 END, 4, 1)" };
+  if (period === 'all') return { key: 'all', label: 'All time', paymentWhere: 'TRUE', expenseWhere: 'TRUE' };
+  return { key: 'month', label: 'Current month', paymentWhere: "date_trunc('month', created_at AT TIME ZONE 'Asia/Kolkata') = date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata')", expenseWhere: "date_trunc('month', expense_date) = date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata')" };
+}
+
+async function reportData(period) {
+  const scope = reportPeriod(period);
+  const scalar = async (sql) => Number((await db.get(sql)).n || 0);
+  const [collections, expenses, admissions, renewals, outstanding, payments, expenseRows] = await Promise.all([
+    scalar(`SELECT COALESCE(SUM(amount),0)::int n FROM payments WHERE status='paid' AND ${scope.paymentWhere}`),
+    scalar(`SELECT COALESCE(SUM(amount),0)::int n FROM expenses WHERE ${scope.expenseWhere}`),
+    scalar(`SELECT COUNT(*)::int n FROM user_memberships WHERE ${scope.paymentWhere.replace(/created_at/g, 'starts_at')}`),
+    scalar(`SELECT COUNT(*)::int n FROM payments WHERE status='paid' AND COALESCE(note,'') ILIKE 'Renewal%' AND ${scope.paymentWhere}`),
+    scalar('SELECT COALESCE(SUM(pending_amount),0)::int n FROM user_memberships'),
+    db.all(`SELECT id,name,email,plan,amount,method,note,created_at FROM payments WHERE status='paid' AND ${scope.paymentWhere} ORDER BY created_at DESC`),
+    db.all(`SELECT * FROM expenses WHERE ${scope.expenseWhere} ORDER BY expense_date DESC, id DESC`),
+  ]);
+  return { key: scope.key, label: scope.label, summary: { collections, expenses, netCollections: collections - expenses, admissions, renewals, outstanding }, payments, expenses: expenseRows };
 }
 
 // ----------------------------- Config + content --------------------------
@@ -732,7 +782,10 @@ app.post('/api/admin/members', requireAdmin, h(async (req, res) => {
   const phone = (b.phone || '').trim();
   const plan = b.plan || 'Membership';
   const session = b.session || null;
-  const total = parseInt(b.amount, 10) || 0;
+  const packageAmount = Math.max(0, parseInt(b.amount, 10) || 0);
+  const feeSettings = await membershipFeeSettings();
+  const membershipFee = feeSettings.enabled ? feeSettings.amount : 0;
+  const total = packageAmount + membershipFee;
   const cash = parseInt(b.cashAmount, 10) || 0;
   const online = parseInt(b.onlineAmount, 10) || 0;
   const discount = parseInt(b.discount, 10) || 0;
@@ -749,14 +802,14 @@ app.post('/api/admin/members', requireAdmin, h(async (req, res) => {
   if (!memberId) memberId = await nextMemberId();
   const note = paymentModeNote(cash, online, pending);
   await db.run(`INSERT INTO user_memberships
-     (email, name, phone, plan, amount, paid_amount, pending_amount, cash_amount, online_amount, discount, discount_note, starts_at, expires_at, session, membership_id, method)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
-    [email, name, phone, plan, total, paid, pending, cash, online, discount, discountNote || null, startISO, expISO, session, memberId, note]);
+      (email, name, phone, plan, amount, paid_amount, pending_amount, cash_amount, online_amount, discount, discount_note, membership_fee, starts_at, expires_at, session, membership_id, method)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+     [email, name, phone, plan, total, paid, pending, cash, online, discount, discountNote || null, membershipFee, startISO, expISO, session, memberId, note]);
   const pay = await db.get(`INSERT INTO payments (name,email,phone,plan,amount,status,method,session,membership_id,note,bill_amount,due_amount,created_at) VALUES ($1,$2,$3,$4,$5,'paid',$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
     [name, email, phone, plan, paid, note, session, memberId, discountNote ? ('New membership · ' + discountNote) : 'New membership', total, pending, startISO]);
   let invoiceNo = null;
   if (email) { const inv = await issueInvoice(pay, expISO); invoiceNo = inv.invoiceNo; } // invoice only if we have an email
-  res.json({ ok: true, memberId, expires: expISO, pending, invoiceNo, emailed: !!email && mailerReady });
+  res.json({ ok: true, memberId, expires: expISO, pending, invoiceNo, packageAmount, membershipFee, total, emailed: !!email && mailerReady });
 }));
 // Clear a member's pending (due) balance when they pay the rest later.
 app.post('/api/admin/members/:id/clear-pending', requireAdmin, h(async (req, res) => {
@@ -780,12 +833,34 @@ app.post('/api/admin/members/:id/clear-pending', requireAdmin, h(async (req, res
   res.json({ ok: true, pending: newPending, clearedAt: newPending === 0 ? when.toISOString() : null });
 }));
 // Delete a member and ALL their data (memberships + payments) by membership id. Owner only.
+// app.delete('/api/admin/members/:id', requireOwner, h(async (req, res) => {
+//   const m = await db.get('SELECT email FROM user_memberships WHERE id=$1', [req.params.id]);
+//   if (!m) return res.status(404).json({ error: 'Member not found.' });
+//   await db.run('DELETE FROM user_memberships WHERE email=$1', [m.email]);
+//   await db.run('DELETE FROM payments WHERE email=$1', [m.email]);
+//   res.json({ ok: true, email: m.email });
+// }));
 app.delete('/api/admin/members/:id', requireOwner, h(async (req, res) => {
-  const m = await db.get('SELECT email FROM user_memberships WHERE id=$1', [req.params.id]);
+  const m = await db.get(
+    'SELECT id, email, membership_id FROM user_memberships WHERE id=$1',
+    [req.params.id]
+  );
+
   if (!m) return res.status(404).json({ error: 'Member not found.' });
-  await db.run('DELETE FROM user_memberships WHERE email=$1', [m.email]);
-  await db.run('DELETE FROM payments WHERE email=$1', [m.email]);
-  res.json({ ok: true, email: m.email });
+
+  await db.run(
+    'DELETE FROM user_memberships WHERE id=$1',
+    [m.id]
+  );
+
+  if (m.membership_id) {
+    await db.run(
+      'DELETE FROM payments WHERE membership_id=$1',
+      [m.membership_id]
+    );
+  }
+
+  res.json({ ok: true, membershipId: m.membership_id });
 }));
 // Delete a single payment record. Owner only.
 app.delete('/api/admin/payments/:id', requireOwner, h(async (req, res) => {
@@ -921,6 +996,18 @@ app.patch('/api/admin/members/:id', requireOwner, h(async (req, res) => {
      amount=$7, paid_amount=$8, pending_amount=$9, cash_amount=$10, online_amount=$11, starts_at=$12, expires_at=$13, method=$14
      WHERE id=$15`,
     [name, email, phone, plan, session, membershipId, amount, paid, pending, cash, online, starts, expires, note, req.params.id]);
+  // If the money figures were changed, this is a correction — reconcile the billing ledger so the
+  // Details totals match exactly what was typed (replace the old entries, don't stack on top of them).
+  const moneyChanged = amount !== (m.amount || 0) || paid !== (m.paid_amount || 0) || pending !== (m.pending_amount || 0)
+    || cash !== (m.cash_amount || 0) || online !== (m.online_amount || 0);
+  if (moneyChanged) {
+    await db.run(`DELETE FROM payments WHERE status='paid' AND (
+        (COALESCE(membership_id,'') <> '' AND membership_id = $1)
+        OR (COALESCE($2,'') <> '' AND email = $2))`,
+      [membershipId || '', email || '']);
+    await db.run("INSERT INTO payments (name,email,phone,plan,amount,status,method,session,membership_id,note,bill_amount,due_amount,created_at) VALUES ($1,$2,$3,$4,$5,'paid',$6,$7,$8,$9,$10,$11,$12)",
+      [name || '', email || '', phone || '', plan, paid, note, session || null, membershipId || null, 'Corrected (edit)', amount, pending, starts]);
+  }
   res.json({ ok: true });
 }));
 // Full member detail + transaction history (with timestamps). Powers the "Details" button.
@@ -971,6 +1058,51 @@ app.post('/api/admin/handover', requireAdmin, h(async (req, res) => {
 }));
 app.get('/api/admin/handovers', requireAdmin, h(async (req, res) => res.json(await db.all('SELECT * FROM handovers ORDER BY created_at DESC LIMIT 30'))));
 
+// ----------------------------- Financial reports -------------------------
+app.get('/api/admin/reports', requireOwner, h(async (req, res) => {
+  res.json(await reportData((req.query && req.query.period) || 'month'));
+}));
+app.post('/api/admin/expenses', requireOwner, h(async (req, res) => {
+  const { expense_date, category, description, amount } = req.body || {};
+  const value = parseInt(amount, 10);
+  if (!Number.isFinite(value) || value <= 0) return res.status(400).json({ error: 'Enter an expense amount greater than zero.' });
+  const when = expense_date ? new Date(expense_date) : new Date();
+  if (isNaN(when)) return res.status(400).json({ error: 'Enter a valid expense date.' });
+  const row = await db.get('INSERT INTO expenses (expense_date,category,description,amount,created_by) VALUES ($1,$2,$3,$4,$5) RETURNING id',
+    [when.toISOString().slice(0, 10), String(category || 'General').trim() || 'General', String(description || '').trim(), value, req.adminRole]);
+  res.json({ ok: true, id: row.id });
+}));
+app.delete('/api/admin/expenses/:id', requireOwner, h(async (req, res) => {
+  await db.run('DELETE FROM expenses WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
+}));
+app.get('/api/admin/reports/export/:format', requireOwner, h(async (req, res) => {
+  const report = await reportData((req.query && req.query.period) || 'month');
+  const safePeriod = report.key === 'all' ? 'all-time' : report.key;
+  if (req.params.format === 'pdf') {
+    const pdf = await generateReportPdf(report);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="718-mma-report-${safePeriod}.pdf"`);
+    return res.send(pdf);
+  }
+  if (req.params.format === 'xlsx') {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+      ['718 MMA Gym Financial Report', report.label], [],
+      ['Metric', 'Amount'], ['Collections', report.summary.collections], ['Expenses', report.summary.expenses],
+      ['Net collections', report.summary.netCollections], ['New admissions', report.summary.admissions],
+      ['Renewals', report.summary.renewals], ['Outstanding due', report.summary.outstanding],
+    ]), 'Summary');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(report.payments.map((p) => ({ Date: p.created_at, Member: p.name, Email: p.email, Plan: p.plan, Amount: p.amount, Method: p.method, Note: p.note }))), 'Collections');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(report.expenses.map((e) => ({ Date: e.expense_date, Category: e.category, Description: e.description, Amount: e.amount, AddedBy: e.created_by }))), 'Expenses');
+    const file = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="718-mma-report-${safePeriod}.xlsx"`);
+    return res.send(file);
+  }
+  return res.status(404).json({ error: 'Export format must be pdf or xlsx.' });
+}));
+
 // ----------------------------- Worldline terminal (push to Antera) --------
 // Reception "Online" path: send the amount to the physical terminal.
 app.post('/api/admin/terminal/charge', requireAdmin, h(async (req, res) => {
@@ -1017,6 +1149,16 @@ app.post('/api/worldline/webhook', h(async (req, res) => {
 }));
 
 app.get('/api/admin/memberships', requireAdmin, h(async (req, res) => res.json(await db.all('SELECT * FROM memberships ORDER BY sort'))));
+app.get('/api/admin/membership-fee', requireAdmin, h(async (req, res) => res.json(await membershipFeeSettings())));
+app.patch('/api/admin/membership-fee', requireOwner, h(async (req, res) => {
+  const enabled = !!(req.body && req.body.enabled);
+  const amount = Math.max(0, parseInt(req.body && req.body.amount, 10) || 0);
+  await Promise.all([
+    setSetting('membership_fee_enabled', String(enabled)),
+    setSetting('membership_fee_amount', String(amount || 1000)),
+  ]);
+  res.json({ ok: true, enabled, amount: amount || 1000 });
+}));
 app.patch('/api/admin/memberships/:id', requireOwner, h(async (req, res) => {
   const { price, name, duration, type } = req.body || {};
   const m = await db.get('SELECT * FROM memberships WHERE id = $1', [req.params.id]);

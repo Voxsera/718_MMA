@@ -98,6 +98,24 @@ async function init() {
     );
   `);
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS invoice_sequences (
+      financial_year TEXT PRIMARY KEY, last_number INTEGER NOT NULL DEFAULT 0
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS invoice_number_migration_log (
+      payment_id INTEGER PRIMARY KEY, old_invoice_no TEXT, new_invoice_no TEXT NOT NULL,
+      migrated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS expenses (
+      id SERIAL PRIMARY KEY, expense_date DATE NOT NULL DEFAULT CURRENT_DATE,
+      category TEXT NOT NULL DEFAULT 'General', description TEXT, amount INTEGER NOT NULL CHECK (amount >= 0),
+      created_by TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS certificates (
       id SERIAL PRIMARY KEY, cert_id TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
       course TEXT, cert_date TEXT, image TEXT, photo TEXT, created_at TIMESTAMPTZ DEFAULT now()
@@ -126,6 +144,8 @@ async function init() {
   await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS cash_amount INTEGER DEFAULT 0`);
   await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS online_amount INTEGER DEFAULT 0`);
   await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS pending_cleared_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE user_memberships ADD COLUMN IF NOT EXISTS membership_fee INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE payments ADD COLUMN IF NOT EXISTS membership_fee INTEGER NOT NULL DEFAULT 0`);
 }
 
 module.exports = { pool, all, get, run, init };
