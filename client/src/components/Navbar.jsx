@@ -7,6 +7,7 @@ const LINKS = [
   { to: '/courses', label: 'Courses' },
   { to: '/memberships', label: 'Memberships' },
   { to: '/events', label: 'Events' },
+  { to: '/achievements', label: 'Achievements' },
   { to: '/food', label: 'Food' },
   { to: '/collaboration', label: 'Collab' },
   { to: '/about', label: 'About' },

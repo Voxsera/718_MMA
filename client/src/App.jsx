@@ -11,6 +11,7 @@ import Courses from './pages/Courses.jsx';
 import CourseDetail from './pages/CourseDetail.jsx';
 import Memberships from './pages/Memberships.jsx';
 import Events from './pages/Events.jsx';
+import Achievements from './pages/Achievements.jsx';
 import Food from './pages/Food.jsx';
 import Collaboration from './pages/Collaboration.jsx';
 import Trial from './pages/Trial.jsx';
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="/courses/:slug" element={<CourseDetail />} />
           <Route path="/memberships" element={<Memberships />} />
           <Route path="/events" element={<Events />} />
+          <Route path="/achievements" element={<Achievements />} />
           <Route path="/food" element={<Food />} />
           <Route path="/collaboration" element={<Collaboration />} />
           <Route path="/trial" element={<Trial />} />
